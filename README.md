@@ -129,8 +129,8 @@ Obviously you can get fancy by instructing it to follow redirects (or not), disa
 It should be relatively easy though to parse this separately and pass the results to ".setBlocked()".
 
 - Its exclusion algorithm is currently 2-fold:
-1. If it sees the exact same URL, it'll be ignored
-2. It also has a way less strict "domain and path" check only (which, in short, ignores protocol and parameters)
+  1. If it sees the exact same URL, it'll be ignored
+  2. It also has a way less strict "domain and path" check only (which, in short, ignores protocol and parameters)
 
 # License
 The BSD 2-Clause License
