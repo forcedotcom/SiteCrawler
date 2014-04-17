@@ -57,10 +57,12 @@ Obviously you can get fancy by instructing it to follow redirects (or not), disa
  * By default, the crawler starts with javascript disabled. This will turn the default parser on
  */
 .enableJavaScript()
+.disableJavaScript()
 
 /**
- * By default, the crawler follows redirects to it's final target. Setting this will not follow these redirect
+ * By default, the crawler follows redirects to it's final target. You can manipulate this using these methonds.
  */
+.enableRedirects()
 .disableRedirects()
 
 /**
@@ -105,6 +107,19 @@ Obviously you can get fancy by instructing it to follow redirects (or not), disa
 
 ## Options (after starting the crawler)
 ```java
+/**
+ * The regular pause and unpause allow the crawler to stop processing the queue (but continue the running I/O threads and modules).
+ * If you require the I/O threads and modules to be shutdown as well, use the "hard" methods.
+ *
+ * Unpausing in either case means that the queue will processed again (and the threads/modules to be started again as well).
+ */
+.pause() / .unpause()
+.hardPause() / .hardUnpause()
+
+/**
+ * This is simply an alias for .hardPause() followed by a .hardUnpause().
+ */
+.reset()
 /**
  * This will tell the Crawler to stop adding new pages to the list of pages to crawl.
  * It will process the list as it stands and return normally

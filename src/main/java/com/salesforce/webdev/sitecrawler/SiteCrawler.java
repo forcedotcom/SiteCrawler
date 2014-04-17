@@ -441,6 +441,13 @@ public class SiteCrawler {
     }
 
     /**
+     * <p>Disabled "javascript" for all {@link WebClient}s in the pool.</p>
+     */
+    public void disableJavaScript() {
+        this.enabledJavascript = false;
+    }
+
+    /**
      * <p>Add a cookie to all {@link WebClient}s in the pool.<p>
      * 
      * @param name name of the cookie
