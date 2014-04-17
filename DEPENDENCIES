@@ -1,0 +1,27 @@
+Direct dependencies
+-------------------
+JCL - http://www.slf4j.org/ | http://www.slf4j.org/license.html
+MIT license
+
+HtmlUnit - http://htmlunit.sourceforge.net/
+Apache 2 license
+
+commons-lang - http://commons.apache.org/proper/commons-lang/
+Apache 2 license
+
+junit - http://junit.org/
+Eclipse Public License - v 1.0
+
+Inherited dependencies
+----------------------
+Nekohtml - http://nekohtml.sourceforge.net/
+Apache 2 license
+
+cssparser - http://cssparser.sourceforge.net/
+LGPL - GNU Lesser General Public License
+
+Jetty libraries | http://www.eclipse.org/jetty/licenses.php
+Apache License 2.0, Eclipse Public License 1.0
+
+"commons-" libraries
+Apache 2 license
