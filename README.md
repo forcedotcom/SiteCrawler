@@ -124,6 +124,9 @@ Obviously you can get fancy by instructing it to follow redirects (or not), disa
 .getCrawlProgress()
 ```
 
+## Installation
+This is a basic maven project, so a simple `mvn install` should suffice to get it locally installed.
+ 
 ## Notes
 - The crawler does not listen of adhere to "robots.txt".
 It should be relatively easy though to parse this separately and pass the results to ".setBlocked()".
