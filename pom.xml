@@ -18,7 +18,7 @@ It also allow for setting &quot;blocked&quot; URLs. Those URLs or patterns will 
         <url>http://www.salesforce.com</url>
     </organization>
     <scm>
-        <url>https://git.soma.salesforce.com/webdev/SiteCrawler</url>
+        <url>https://github.com/forcedotcom/SiteCrawler</url>
         <developerConnection>Jasper Roel</developerConnection>
     </scm>
 
@@ -64,18 +64,5 @@ It also allow for setting &quot;blocked&quot; URLs. Those URLs or patterns will 
         </plugins>
     </build>
 
-    <distributionManagement>
-        <repository>
-            <uniqueVersion>false</uniqueVersion>
-            <id>salesforce_releases</id>
-            <url>${nexus.release.url}</url>
-        </repository>
-        <snapshotRepository>
-            <uniqueVersion>true</uniqueVersion>
-            <id>salesforce_snapshots</id>
-            <url>${nexus.snapshot.url}</url>
-        </snapshotRepository>
-    </distributionManagement>
-
-    <url>https://git.soma.salesforce.com/webdev/SiteCrawler</url>
+    <url>https://github.com/forcedotcom/SiteCrawler</url>
 </project>
