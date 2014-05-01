@@ -139,6 +139,18 @@ Obviously you can get fancy by instructing it to follow redirects (or not), disa
 .getCrawlProgress()
 ```
 
+## Command line options (VM arguments)
+The crawler also supports some quick configuration through VM arguments:
+
+* sc:threadLimit=&lt;int&gt; 
+* sc:maxProcessWaiting=&lt;int&gt; 
+* sc:shortCircuitAfter=&lt;int&gt; 
+
+This will allow you to control the initial settings through the command line instead of Java code. An example would be:
+```
+java -jar siteCrawler.jar -Dsc:threadLimit=4 -Dsc:maxProcessWaiting=100 -Dsc:shortCircuitAfter=1000
+```
+
 ## Installation
 This is a basic maven project, so a simple `mvn install` should suffice to get it locally installed.
  

@@ -32,6 +32,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -137,7 +138,7 @@ public class SiteCrawler {
     private Thread pageServiceConsumer;
 
     /**
-     * <p>This is the ratio of I/O threads vs processing of downloaded pages. Defaults to 2.</p>
+     * <p>This is the ratio of I/O threads vs processing of downloaded pages. Defaults to <code>0.5</code>.</p>
      */
     private final double downloadVsProcessRatio = 0.5;
 
@@ -248,11 +249,11 @@ public class SiteCrawler {
      * <p>This also sets up the a pool of {@link WebClient}s, based on {@link #threadLimit}.</p>
      * 
      * @param baseUrl The base Url, starting with the protocol, NOT ending with a / (so: "http://www.site.com").
-     *        Cannot be null
+     *            Cannot be null
      * @param baseUrlSecure The base secure Url, starting with the protocol, NOT ending with a / (so:
-     *        "https://www.site.com"). Can be null
+     *            "https://www.site.com"). Can be null
      * @param actions list of {@link SiteCrawlerAction}s, these are the actions that will be called, either when an
-     *        Exception happens, or when any page is successfully loaded
+     *            Exception happens, or when any page is successfully loaded
      */
     public SiteCrawler(String baseUrl, String baseUrlSecure, SiteCrawlerAction... actions) {
         this(baseUrl, baseUrlSecure, Collections.unmodifiableList(Arrays.asList(actions)));
@@ -265,16 +266,17 @@ public class SiteCrawler {
      * <p>This also sets up the a pool of {@link WebClient}s, based on {@link #threadLimit}.</p>
      * 
      * @param baseUrl The base Url, starting with the protocol, NOT ending with a / (so: "http://www.site.com").
-     *        Cannot be null
+     *            Cannot be null
      * @param baseUrlSecure The base secure Url, starting with the protocol, NOT ending with a / (so:
-     *        "https://www.site.com"). Can be null
+     *            "https://www.site.com"). Can be null
      * @param actions {@link List} of {@link SiteCrawlerAction}s, these are the actions that will be called, either when
-     *        an Exception happens, or when any page is successfully loaded
+     *            an Exception happens, or when any page is successfully loaded
      */
     public SiteCrawler(String baseUrl, String baseUrlSecure, List<? extends SiteCrawlerAction> actions) {
         this.baseUrl = baseUrl;
         this.baseUrlSecure = baseUrlSecure;
         this.actions = actions;
+        parseVMOptions();
     }
 
     /**
@@ -642,6 +644,23 @@ public class SiteCrawler {
     private void reset() {
         hardPause();
         hardUnpause();
+    }
+
+    private void parseVMOptions() {
+        int threadLimit = NumberUtils.toInt(System.getProperty("sc:threadLimit"));
+        if (threadLimit > 0) {
+            setThreadLimit(threadLimit);
+        }
+
+        int maxProcessWaiting = NumberUtils.toInt(System.getProperty("sc:maxProcessWaiting"));
+        if (maxProcessWaiting > 0) {
+            setMaxProcessWaiting(maxProcessWaiting);
+        }
+
+        int shortCircuitAfter = NumberUtils.toInt(System.getProperty("sc:shortCircuitAfter"));
+        if (shortCircuitAfter > 0) {
+            setShortCircuitAfter(shortCircuitAfter);
+        }
     }
 
     /**
