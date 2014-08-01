@@ -30,12 +30,12 @@ It also allow for setting &quot;blocked&quot; URLs. Those URLs or patterns will 
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>jcl-over-slf4j</artifactId>
-            <version>1.7.5</version>
+            <version>1.7.7</version>
         </dependency>
         <dependency>
             <groupId>net.sourceforge.htmlunit</groupId>
             <artifactId>htmlunit</artifactId>
-            <version>2.13</version>
+            <version>2.15</version>
         </dependency>
         <dependency>
             <groupId>commons-lang</groupId>
@@ -45,7 +45,7 @@ It also allow for setting &quot;blocked&quot; URLs. Those URLs or patterns will 
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
-            <version>4.8.1</version>
+            <version>4.11</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -65,4 +65,23 @@ It also allow for setting &quot;blocked&quot; URLs. Those URLs or patterns will 
     </build>
 
     <url>https://github.com/forcedotcom/SiteCrawler</url>
+
+    <reporting>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>versions-maven-plugin</artifactId>
+                <version>2.1</version>
+                <reportSets>
+                    <reportSet>
+                        <reports>
+                            <report>dependency-updates-report</report>
+                            <report>plugin-updates-report</report>
+                            <report>property-updates-report</report>
+                        </reports>
+                    </reportSet>
+                </reportSets>
+            </plugin>
+        </plugins>
+    </reporting>
 </project>
