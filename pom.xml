@@ -7,7 +7,7 @@
     <packaging>jar</packaging>
 
     <name>SiteCrawler</name>
-    <description>This project provides a simple WebCrawler with retry-capabilties, functionality to distinguish between http/https sites.
+    <description>This project provides a simple WebCrawler with retry-capabilities, functionality to distinguish between http/https sites.
 
 It biggest feature is that it allows for plugins (or CrawlerActions), which allows you to hook your scripts into the crawling process.
 
@@ -30,12 +30,12 @@ It also allow for setting &quot;blocked&quot; URLs. Those URLs or patterns will 
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>jcl-over-slf4j</artifactId>
-            <version>1.7.5</version>
+            <version>1.7.10</version>
         </dependency>
         <dependency>
             <groupId>net.sourceforge.htmlunit</groupId>
             <artifactId>htmlunit</artifactId>
-            <version>2.13</version>
+            <version>2.15</version>
         </dependency>
         <dependency>
             <groupId>commons-lang</groupId>
@@ -45,7 +45,7 @@ It also allow for setting &quot;blocked&quot; URLs. Those URLs or patterns will 
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
-            <version>4.8.1</version>
+            <version>4.12</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

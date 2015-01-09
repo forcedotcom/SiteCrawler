@@ -212,6 +212,8 @@ public class ProcessPage implements Callable<Collection<String>> {
                     } catch (Exception e) {
                         logger.error("Failed to make this relative URL absolute: {}", href, e);
                     }
+                } else {
+                    logger.trace("makeRelativeUrlAbsolute is disabled");
                 }
             }
 

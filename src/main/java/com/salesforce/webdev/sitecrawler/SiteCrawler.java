@@ -32,7 +32,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,6 +88,12 @@ public class SiteCrawler {
     }
 
     /**
+     * <p>Some sites don't use suffixes. This allows turning that off.
+     * Otherwise, only pages in {@link #allowedSuffixes} are allowed.</p>
+     */
+    private boolean requireAllowedSuffixes = true;
+
+    /**
      * <p>The collection of URLs we have crawled / check against for uniqueness.</p>
      */
     private Set<String> visited = new ConcurrentSkipListSet<String>();
@@ -138,15 +143,28 @@ public class SiteCrawler {
     private Thread pageServiceConsumer;
 
     /**
-     * <p>This is the ratio of I/O threads vs processing of downloaded pages. Defaults to <code>0.5</code>.</p>
+     * <p>This is the ratio of I/O threads vs processing of downloaded pages. Defaults to <code>2.0</code>.</p>
+     * 
+     * <p>Example, if this is set to "2.0", that means it's X (say, 12) download threads VS 2X (24 in that case) parse threads).</p>
      */
-    private final double downloadVsProcessRatio = 0.5;
+    private final double downloadVsProcessRatio = 2;
+
+    /**
+     * <p>This determines the amount of heap used for storing unprocessed pages. Should be between 0 and 1.</p>
+     * 
+     * <p>Example, if the max heap (Xmx) is set to 8Gb, a ratio of 0.4 means roughly 3276 (8 * 1024 * 0.4) Mb of heap taken for storing downloading pages.</p>
+     */
+    private double maxProcessWaitingRatio = 0.4;
 
     /**
      * <p>If there are more pages then this waiting to be processing, we pause the crawling to avoid exhausting the
      * memory.</p>
+     * 
+     * <p>Keep in mind that each page/process waiting costs about 1Mb in memory. So, a value of 500 means a <em>heap requirement of 500Mb</em>.</p>
+     * 
+     * <p>This is partly controlled by {@link #maxProcessWaitingRatio}.</p>
      */
-    private int maxProcessWaiting = 2000;
+    private int maxProcessWaiting;
 
     /**
      * <p>For the regularly updates, this dictates how often we should print that update.</p>
@@ -154,10 +172,10 @@ public class SiteCrawler {
     private final int reportProgressPerDownloadedPages = 2000;
 
     /**
-     * <p>This Executor determines how many I/O (network) threads to use to crawl the site (thread limit set by
-     * {@link #threadLimit}).</p>
+     * <p>This Executor determines how many I/O (network) threads to use to crawl the site (thread limit set by {@link #threadLimit}).</p>
      */
     private ExecutorService linkExecutor;
+
     /**
      * <p>This navigates and downloads the pages.</p>
      */
@@ -177,8 +195,7 @@ public class SiteCrawler {
     /**
      * <p>The pool is used to provide {@link WebClient}s to the {@link #linkService}.</p>
      * 
-     * <p>By default, it is initialized to the same amount of clients as the Service has threads ({@link #threadLimit}
-     * .</p>
+     * <p>By default, it is initialized to the same amount of clients as the Service has threads ({@link #threadLimit} .</p>
      */
     private WebClientPool wcPool;
 
@@ -196,6 +213,12 @@ public class SiteCrawler {
      * <p>Internal counter, keeping track of how many pages we have completely processed (and discarded).</p>
      */
     private AtomicInteger actuallyVisited = new AtomicInteger();
+
+    /**
+     * <p>Internal counter to count how many pages have been downloaded an fully processed.</p>
+     * (This is different from actuallyVisited, since that decreases too!)
+     */
+    private AtomicInteger fullyProcessed = new AtomicInteger();
 
     /**
      * <p>If the crawler is running or not.</p>
@@ -276,7 +299,6 @@ public class SiteCrawler {
         this.baseUrl = baseUrl;
         this.baseUrlSecure = baseUrlSecure;
         this.actions = actions;
-        parseVMOptions();
     }
 
     /**
@@ -310,6 +332,22 @@ public class SiteCrawler {
     }
 
     /**
+     * <p>Sets the maxProcessWaitingRatio.</p>
+     * 
+     * @param maxProcessWaitingRatio has to be between 0 and 1
+     */
+    public void setMaxProcessWaitingRatio(double maxProcessWaitingRatio) {
+        if (maxProcessWaitingRatio < 0 || maxProcessWaitingRatio > 1) {
+            throw new IllegalArgumentException("maxProcessWaitingRatio has to be between 0 and 1");
+        }
+        this.maxProcessWaitingRatio = maxProcessWaitingRatio;
+
+        if (running) {
+            reset();
+        }
+    }
+
+    /**
      * <p>Will cause the crawler to stop adding new pages to the crawler threads.</p>
      */
     public void pause() {
@@ -336,8 +374,7 @@ public class SiteCrawler {
     }
 
     /**
-     * <p>This will re-initialize the WebClientPool, wait for all the consumers to be started again and cause an
-     * {@link #unpause()} when the system is ready to resume crawling.</p>
+     * <p>This will re-initialize the WebClientPool, wait for all the consumers to be started again and cause an {@link #unpause()} when the system is ready to resume crawling.</p>
      */
     public void hardUnpause() {
         this.continueProcessing = true;
@@ -447,6 +484,10 @@ public class SiteCrawler {
      */
     public void disableJavaScript() {
         this.enabledJavascript = false;
+    }
+
+    public void setRequireAllowedSuffixes(boolean requireAllowedSuffixes) {
+        this.requireAllowedSuffixes = requireAllowedSuffixes;
     }
 
     /**
@@ -598,9 +639,10 @@ public class SiteCrawler {
         StringBuilder sb = new StringBuilder();
         sb.append(actuallyVisited.get()).append(" crawled. ");
         sb.append(leftToCrawl).append(" left to crawl. ");
-        sb.append(linksScheduled.get()).append(" scheduled for download. ");
-        sb.append(pagesScheduled.get()).append(" scheduled for processing. ");
-        sb.append(Math.round((new Double(visitedCounter.get()) / (visitedCounter.get() + leftToCrawl)) * 10000) / 100.0)
+        sb.append(linksScheduled.get()).append(" scheduled for download. "); // (submitted a NavigateThread!)
+        sb.append(pagesScheduled.get()).append(" scheduled for processing. "); // (in LIMBO, downloaded but NOT processed)
+        sb.append(fullyProcessed.get()).append(" fully processed. ");
+        sb.append(Math.round((new Double(fullyProcessed.get()) / (fullyProcessed.get() + leftToCrawl)) * 10000) / 100.0)
             .append(
                 "% complete.");
 
@@ -608,7 +650,7 @@ public class SiteCrawler {
     }
 
     /**
-     * <p>Does it's best to reset/recreate the WebClient Pool (wcPool) and the link and page consumers.</p>
+     * <p>Does its best to reset/recreate the WebClient Pool (wcPool) and the link and page consumers.</p>
      */
     private void init() {
         if (null != wcPool) {
@@ -633,9 +675,16 @@ public class SiteCrawler {
         pageExecutor = Executors.newFixedThreadPool(pageExecutorSize, pageExecutorThreadFactory);
         pageService = new ExecutorCompletionService<Collection<String>>(pageExecutor);
 
-        Object[] args = { wcPool.getName(), threadLimit, threadLimit, pageExecutorSize };
-        logger
-            .info("WebClientPool {} created with size {}, linkExecutor with size {}, pageExecutor with size {}", args);
+        // in bytes
+        long maxHeap = Runtime.getRuntime().maxMemory();
+        // to mb
+        double gbMaxHeap = maxHeap / (1024.0 * 1024.0);
+        // Final result, rounded
+        int maxProcessWaiting = (int) (gbMaxHeap * maxProcessWaitingRatio);
+        setMaxProcessWaiting(maxProcessWaiting);
+
+        Object[] args = { wcPool.getName(), threadLimit, threadLimit, pageExecutorSize, maxProcessWaiting };
+        logger.info("WebClientPool {} created with size {}, linkExecutor with size {}, pageExecutor with size {}, maxProcessWaiting={}", args);
     }
 
     /**
@@ -644,23 +693,6 @@ public class SiteCrawler {
     private void reset() {
         hardPause();
         hardUnpause();
-    }
-
-    private void parseVMOptions() {
-        int threadLimit = NumberUtils.toInt(System.getProperty("sc:threadLimit"));
-        if (threadLimit > 0) {
-            setThreadLimit(threadLimit);
-        }
-
-        int maxProcessWaiting = NumberUtils.toInt(System.getProperty("sc:maxProcessWaiting"));
-        if (maxProcessWaiting > 0) {
-            setMaxProcessWaiting(maxProcessWaiting);
-        }
-
-        int shortCircuitAfter = NumberUtils.toInt(System.getProperty("sc:shortCircuitAfter"));
-        if (shortCircuitAfter > 0) {
-            setShortCircuitAfter(shortCircuitAfter);
-        }
     }
 
     /**
@@ -674,6 +706,22 @@ public class SiteCrawler {
             @Override
             public void run() {
                 while (continueProcessing) {
+
+                    try {
+                        if (shouldPauseProcessing()) {
+                            if (forcePause) {
+                                logger.trace("[startLinkServiceConsumer] Crawler is hardpaused...");
+                            } else {
+                                logger.debug("[startLinkServiceConsumer] Analyzing pages (pausing crawling to allow the consumers to catch up)...");
+                            }
+                            Thread.sleep(TimeUnit.SECONDS.toMillis(5));
+                            continue;
+                        }
+                    } catch (InterruptedException e) {
+                        logger.error("startLinkServiceConsumer got interrupted, stopping...");
+                        return;
+                    }
+
                     Future<ProcessPage> result = null;
                     try {
                         result = linkService.poll(5, TimeUnit.SECONDS);
@@ -767,6 +815,7 @@ public class SiteCrawler {
                         logger.error("something went wrong :(", e);
                     } finally {
                         if (result != null) {
+                            fullyProcessed.getAndIncrement();
                             pagesScheduled.getAndDecrement();
                         }
                     }
@@ -811,17 +860,6 @@ public class SiteCrawler {
         while (shouldContinueCrawling()) {
             updateCrawlProgress();
 
-            if (shouldPauseCrawling()) {
-                logger.debug("Analyzing pages (pausing crawling to allow the consumers to catch up...");
-                try {
-                    Thread.sleep(TimeUnit.SECONDS.toMillis(5));
-                    continue;
-                } catch (InterruptedException e) {
-                    logger.error("Interrupted, exiting...", e);
-                    return;
-                }
-            }
-
             String url;
             try {
                 // Cannot be ".take()" since that might block forever.
@@ -859,8 +897,11 @@ public class SiteCrawler {
      * 
      * @return true if the process queue is too large
      */
-    private boolean shouldPauseCrawling() {
-        return linksScheduled.get() > maxProcessWaiting || forcePause;
+    private boolean shouldPauseProcessing() {
+
+        boolean shouldPause = pagesScheduled.get() > maxProcessWaiting || forcePause;
+        logger.trace("ShouldPause=" + shouldPause + ", pagesScheduled=" + pagesScheduled.get());
+        return shouldPause;
     }
 
     /**
@@ -902,8 +943,8 @@ public class SiteCrawler {
      * <p>Logs the progress to the log if appropriate.</p>
      */
     private void updateCrawlProgress() {
-        int visited = visitedCounter.get();
-        // int visited = actuallyVisited.get();
+        // int visited = visitedCounter.get();
+        int visited = actuallyVisited.get();
         if (visited % reportProgressPerDownloadedPages == 0 && visited > visitLogged) {
             logger.info(getCrawlProgress());
             visitLogged = visited;
@@ -929,7 +970,15 @@ public class SiteCrawler {
             url = "/".concat(url);
         }
 
-        return baseUrl.concat(url);
+        if (null != baseUrl) {
+            return baseUrl.concat(url);
+        }
+        if (null != baseUrlSecure) {
+            return baseUrlSecure.concat(url);
+        }
+
+        throw new NullPointerException("Cannot have both baseUrl AND baseUrlSecure be null!");
+
     }
 
     /**
@@ -949,6 +998,7 @@ public class SiteCrawler {
     private boolean isExcluded(String url) {
         boolean startsWithBaseUrl = false;
         boolean startsWithBaseUrlSecure = false;
+        boolean allGood = false;
         if (null != baseUrl && url.startsWith(baseUrl)) {
             logger.trace("startsWithBaseUrl: {}", url);
             startsWithBaseUrl = true;
@@ -959,9 +1009,22 @@ public class SiteCrawler {
             startsWithBaseUrlSecure = true;
         }
 
+        // What about relative (from the base) URLs? We can have "/foo.bar", just not "//foo.bar"
+        if (url.length() > 1 && url.startsWith("/") && !url.startsWith("//")) {
+            logger.trace("This is a relative url, pointing to the BASE: {}", url);
+            allGood = true;
+        }
+
+        // What about relative (from current path) URL? We can have "foo.bar", just not "//foo.bar"
+        // That is not a use-case we currently support (but might need to, for desk.com)
+        // if (url.length() > 1 && !url.startsWith("//")) {
+        // logger.trace("This is a relative url, pointing RELATIVALlY (starting with c): {}", url);
+        // allGood = true;
+        // }
+
         // If it doesn't start with either of the baseUrls (or they are simply not set), we don't allow the URL
-        if (!startsWithBaseUrl && !startsWithBaseUrlSecure) {
-            logger.trace("!startsWithBaseUrl && !startsWithBaseUrlSecure: {}", url);
+        if (!startsWithBaseUrl && !startsWithBaseUrlSecure && !allGood) {
+            logger.trace("!startsWithBaseUrl && !startsWithBaseUrlSecure && !allGood: {}", url);
             return true;
         }
 
@@ -972,6 +1035,10 @@ public class SiteCrawler {
                 hasAllowedSuffix = true;
                 break;
             }
+        }
+        if (!requireAllowedSuffixes) {
+            logger.trace("requireAllowedSuffixes = false, so setting hasAllowedSuffix to true");
+            hasAllowedSuffix = true;
         }
 
         if (!hasAllowedSuffix) {
@@ -990,7 +1057,8 @@ public class SiteCrawler {
         }
 
         // Also check the cleaned URL
-        if (visited.contains(getCleanedUrl(url))) {
+        String cleanUrl = getCleanedUrl(url);
+        if (null != cleanUrl && visited.contains(cleanUrl)) {
             logger.trace("The cleaned URL is blocked [{}], skipping it.", url);
             return true;
         }
@@ -1018,7 +1086,7 @@ public class SiteCrawler {
             logger.trace("Cleaned up URL [{}] to this: {}", url, sb);
             return sb.toString();
         } catch (MalformedURLException e) {
-            logger.error("Could not clean up URL {}", url, e);
+            logger.error("Could not clean up URL (though this could be perfectly fine) {}", url, e);
             return null;
         }
     }
@@ -1051,7 +1119,8 @@ public class SiteCrawler {
                 return true;
             }
         }
-        logger.trace("This URL IS NOT blocked [{}], allowing it., size: {}", checkStr, list.size());
+        logger.trace("This URL IS NOT blocked [{}], allowing it., disallowed collection size: {}", checkStr,
+            list.size());
         return false;
     }
 }
