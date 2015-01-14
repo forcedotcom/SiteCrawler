@@ -32,6 +32,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -114,6 +115,11 @@ public class SiteCrawler {
     private Collection<String> blocked = new ConcurrentSkipListSet<String>();
 
     /**
+     * <p>Collection of URLs (or patterns without URLs) that should ONLY be crawled.</p>
+     */
+    private Collection<String> allowed = new ConcurrentSkipListSet<String>();
+
+    /**
      * <p>The amount of I/O threads / webclients to use. Defaults to the # of available processors.</p>
      */
     private int threadLimit = Runtime.getRuntime().availableProcessors();
@@ -147,7 +153,7 @@ public class SiteCrawler {
      * 
      * <p>Example, if this is set to "2.0", that means it's X (say, 12) download threads VS 2X (24 in that case) parse threads).</p>
      */
-    private final double downloadVsProcessRatio = 2;
+    private double downloadVsProcessRatio = 2;
 
     /**
      * <p>This determines the amount of heap used for storing unprocessed pages. Should be between 0 and 1.</p>
@@ -299,6 +305,7 @@ public class SiteCrawler {
         this.baseUrl = baseUrl;
         this.baseUrlSecure = baseUrlSecure;
         this.actions = actions;
+        parseVMOptions();
     }
 
     /**
@@ -341,6 +348,17 @@ public class SiteCrawler {
             throw new IllegalArgumentException("maxProcessWaitingRatio has to be between 0 and 1");
         }
         this.maxProcessWaitingRatio = maxProcessWaitingRatio;
+
+        if (running) {
+            reset();
+        }
+    }
+
+    public void setDownloadVsProcessRatio(double downloadVsProcessRatio) {
+        if (downloadVsProcessRatio < 0 || downloadVsProcessRatio > 1) {
+            throw new IllegalArgumentException("maxProcessWaitingRatio has to be between 0 and 1");
+        }
+        this.downloadVsProcessRatio = downloadVsProcessRatio;
 
         if (running) {
             reset();
@@ -538,6 +556,20 @@ public class SiteCrawler {
     }
 
     /**
+     * <p>If you set this, only URLs that have one of these patters will be crawled.</p>
+     * 
+     * @param allowed Collection of patterns
+     */
+    public void setAllowed(Collection<String> allowed) {
+        if (null == allowed) {
+            return;
+        }
+        for (String allow : allowed) {
+            this.allowed.add(allow);
+        }
+    }
+
+    /**
      * <p>Return the collection of extensions to be parsed.</p>
      * 
      * <p>This collection is backed by the collection used by the crawler, feel free to manipulate.<br />
@@ -693,6 +725,28 @@ public class SiteCrawler {
     private void reset() {
         hardPause();
         hardUnpause();
+    }
+
+    private void parseVMOptions() {
+        int threadLimit = NumberUtils.toInt(System.getProperty("sc:threadLimit"));
+        if (threadLimit > 0) {
+            setThreadLimit(threadLimit);
+        }
+
+        int maxProcessWaiting = NumberUtils.toInt(System.getProperty("sc:maxProcessWaiting"));
+        if (maxProcessWaiting > 0) {
+            setMaxProcessWaiting(maxProcessWaiting);
+        }
+
+        int shortCircuitAfter = NumberUtils.toInt(System.getProperty("sc:shortCircuitAfter"));
+        if (shortCircuitAfter > 0) {
+            setShortCircuitAfter(shortCircuitAfter);
+        }
+
+        int downloadVsProcessRatio = NumberUtils.toInt(System.getProperty("sc:downloadVsProcessRatio"));
+        if (shortCircuitAfter > 0) {
+            setDownloadVsProcessRatio(downloadVsProcessRatio);
+        }
     }
 
     /**
@@ -1053,6 +1107,11 @@ public class SiteCrawler {
 
         if (listContainsSubstring(blocked, url)) {
             logger.trace("This URL is blocked [{}], skipping it.", url);
+            return true;
+        }
+
+        if (!allowed.isEmpty() && !listContainsSubstring(allowed, url)) {
+            logger.trace("This URL is not allowed [{}], skipping it.", url);
             return true;
         }
 

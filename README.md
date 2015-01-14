@@ -145,6 +145,7 @@ The crawler also supports some quick configuration through VM arguments:
 * sc:threadLimit=&lt;int&gt; 
 * sc:maxProcessWaiting=&lt;int&gt; 
 * sc:shortCircuitAfter=&lt;int&gt; 
+* sc:downloadVsProcessRatio&lt;int&gt;
 
 This will allow you to control the initial settings through the command line instead of Java code. An example would be:
 ```
