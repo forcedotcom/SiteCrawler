@@ -11,6 +11,9 @@
  ******************************************************************************/
 package com.salesforce.webdev.sitecrawler.utils;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * <p>A helper class to normalize a URL.</p>
  * 
@@ -52,20 +55,26 @@ public final class URLNormalizer {
         return url;
     }
 
+    private static Logger logger = LoggerFactory.getLogger(URLNormalizer.class);
+
     /**
-     * <p>If this is already a "normal" URL (starts with an HTTP protocol or a /", we call
-     * {@link #normalize(String, String)}.</p>
+     * <p>If this is already a "normal" URL (starts with an HTTP protocol or a /", we call {@link #normalize(String, String)}.</p>
      * 
      * <p>This normalizer does a small effort to deal with relative URLs as well (hence, the pageOrigin parameter).</p>
      * 
      * @param url A regular URL. Cannot be null
      * @param base A String that gets prepended to the result if #url starts with "/"
-     * @param pageOrigin The page this url appears one. Can be null
+     * @param pageOrigin The page this url appears on. Can be null
      * @return A normalized string with base prepended (if needed) and /index.jsp stripped if present at the end of #url
      */
     public static String normalize(String url, String base, String pageOrigin) {
         url = url.trim();
         if (url.startsWith("/") || url.startsWith("http://") || url.startsWith("https://")) {
+            return normalize(url, base);
+        }
+        
+        if (url.isEmpty() || url.startsWith("tel:") || url.startsWith("#") || url.startsWith("???") || url.startsWith("mailto:")
+            || url.startsWith("javascript:")) {
             return normalize(url, base);
         }
 
@@ -74,8 +83,16 @@ public final class URLNormalizer {
 
             // Assume that it's a relative URL, create a full URL
             url = pageOrigin + url;
+            return normalize(url, base);
         }
 
+        // "assets/foo.png" && "https://www.salesforce.com/bar/"
+        if (null != pageOrigin && pageOrigin.endsWith("/")) {
+            logger.trace("[1/2] found url: {} and pageOrigin: {}...", url, pageOrigin);
+            url = pageOrigin + url;
+            logger.trace("[2/2] ...created: {}", url);
+            return normalize(url, base);
+        }
         return normalize(url, base);
     }
 }

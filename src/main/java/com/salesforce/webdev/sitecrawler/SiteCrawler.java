@@ -87,6 +87,8 @@ public class SiteCrawler {
         allowedSuffixes.add(".htm");
         allowedSuffixes.add(".html");
     }
+    
+    private Collection<String> allowedParameters = new ArrayList<String>();
 
     /**
      * <p>Some sites don't use suffixes. This allows turning that off.
@@ -507,6 +509,19 @@ public class SiteCrawler {
     public void setRequireAllowedSuffixes(boolean requireAllowedSuffixes) {
         this.requireAllowedSuffixes = requireAllowedSuffixes;
     }
+    
+    public void setAllowedParameters(final Collection<String> parameters) {
+        this.allowedParameters.clear();
+        this.allowedParameters.addAll(parameters);
+    }
+    
+    public void addAllowedParameters(final String parameter) {
+        this.allowedParameters.add(parameter);
+    }
+    
+    public void removeAllowedParameter(final String parameter) {
+        this.allowedParameters.remove(parameter);
+    }
 
     /**
      * <p>Add a cookie to all {@link WebClient}s in the pool.<p>
@@ -594,7 +609,11 @@ public class SiteCrawler {
         init();
 
         if (toVisit.isEmpty()) {
-            toVisit.add(baseUrl);
+            if (null != baseUrl) {
+                toVisit.add(baseUrl);
+            } else if (null != baseUrlSecure) {
+                toVisit.add(baseUrlSecure);
+            }
         }
 
         startLinkServiceConsumer();
@@ -990,6 +1009,11 @@ public class SiteCrawler {
             return false;
         }
 
+        if (!forcePause && !continueProcessing) {
+            logger.info("This crawler has been shutdown (without pause or reset). Thereforce, stopping the crawl");
+            return false;
+        }
+
         return true;
     }
 
@@ -999,7 +1023,9 @@ public class SiteCrawler {
     private void updateCrawlProgress() {
         // int visited = visitedCounter.get();
         int visited = actuallyVisited.get();
-        if (visited % reportProgressPerDownloadedPages == 0 && visited > visitLogged) {
+        if ((
+            (visited - visitLogged) > reportProgressPerDownloadedPages && visited > visitLogged)
+            || visitLogged == -1) {
             logger.info(getCrawlProgress());
             visitLogged = visited;
         }
@@ -1133,7 +1159,7 @@ public class SiteCrawler {
      * @return the "clean" URL (www.salesforce.com/foo.html for example) or null if url is empty or an Exception
      *         happened
      */
-    private String getCleanedUrl(String url) {
+    protected String getCleanedUrl(String url) {
         if (null == url) {
             return null;
         }
@@ -1141,6 +1167,37 @@ public class SiteCrawler {
             URL cleanUrl = new URL(url);
             StringBuilder sb = new StringBuilder();
             sb.append(cleanUrl.getHost()).append(cleanUrl.getPath());
+
+            String q = cleanUrl.getQuery();
+            if (null != q && !q.isEmpty() && !allowedParameters.isEmpty()) {
+                boolean firstItem = true;
+                // Split into parts
+                String[] qParts = q.split("&");
+                logger.debug("Query Parts: {}", (Object)qParts);
+                for (String qPart : qParts) {
+                    // Get the key
+                    String qKey = qPart;
+                    logger.debug("Query Key: {}", qKey);
+                    if (qPart.contains("=")) {
+                        qKey = qPart.substring(0, qPart.indexOf("="));
+                        logger.debug("Query Key (sub'd): {}", qKey);
+                    }
+                    // Now we check of that key is allowed
+                    if (allowedParameters.contains(qKey)) {
+                        logger.debug("allowedParameters contains {}", qKey);
+                        // We do, so attach it to the URL
+                        if (firstItem) {
+                            sb.append("?");
+                            firstItem = false;
+                        } else {
+                            sb.append("&");
+                        }
+                        sb.append(qPart);
+                    } else {
+                        logger.debug("allowedParameters DOES NOT contains {}", qKey);
+                    }
+                }
+            }
 
             logger.trace("Cleaned up URL [{}] to this: {}", url, sb);
             return sb.toString();
@@ -1174,11 +1231,11 @@ public class SiteCrawler {
         for (String s : list) {
             logger.trace("CHECKING This URL [{}] for {}", checkStr, s);
             if (checkStr.contains(s)) {
-                logger.trace("This URL IS blocked [{}] because of {}, skipping it.", checkStr, s);
+                logger.trace("This URL [{}] matches because of {}, so we're returning true.", checkStr, s);
                 return true;
             }
         }
-        logger.trace("This URL IS NOT blocked [{}], allowing it., disallowed collection size: {}", checkStr,
+        logger.trace("This URL [{}] did NOT match anything., checked against collection of size: {}", checkStr,
             list.size());
         return false;
     }
