@@ -87,7 +87,7 @@ public class SiteCrawler {
         allowedSuffixes.add(".htm");
         allowedSuffixes.add(".html");
     }
-    
+
     private Collection<String> allowedParameters = new ArrayList<String>();
 
     /**
@@ -509,16 +509,16 @@ public class SiteCrawler {
     public void setRequireAllowedSuffixes(boolean requireAllowedSuffixes) {
         this.requireAllowedSuffixes = requireAllowedSuffixes;
     }
-    
+
     public void setAllowedParameters(final Collection<String> parameters) {
         this.allowedParameters.clear();
         this.allowedParameters.addAll(parameters);
     }
-    
+
     public void addAllowedParameters(final String parameter) {
         this.allowedParameters.add(parameter);
     }
-    
+
     public void removeAllowedParameter(final String parameter) {
         this.allowedParameters.remove(parameter);
     }
@@ -594,6 +594,10 @@ public class SiteCrawler {
      */
     public Collection<String> getAllowedSuffixes() {
         return allowedSuffixes;
+    }
+
+    public void addAllowedSuffixes(Collection<String> allowed) {
+        this.allowedSuffixes.addAll(allowed);
     }
 
     /**
@@ -1050,15 +1054,14 @@ public class SiteCrawler {
             url = "/".concat(url);
         }
 
-        if (null != baseUrl) {
-            return baseUrl.concat(url);
-        }
         if (null != baseUrlSecure) {
             return baseUrlSecure.concat(url);
         }
+        if (null != baseUrl) {
+            return baseUrl.concat(url);
+        }
 
         throw new NullPointerException("Cannot have both baseUrl AND baseUrlSecure be null!");
-
     }
 
     /**
@@ -1111,6 +1114,7 @@ public class SiteCrawler {
         boolean hasAllowedSuffix = false;
         String suffix = url.split("\\?")[0].toLowerCase();
         for (String allowedSuffix : allowedSuffixes) {
+            logger.trace("Matching allowed suffix [{}] against URL {}", allowedSuffix, suffix, url);
             if (suffix.endsWith(allowedSuffix)) {
                 hasAllowedSuffix = true;
                 break;
@@ -1173,7 +1177,7 @@ public class SiteCrawler {
                 boolean firstItem = true;
                 // Split into parts
                 String[] qParts = q.split("&");
-                logger.debug("Query Parts: {}", (Object)qParts);
+                logger.debug("Query Parts: {}", (Object) qParts);
                 for (String qPart : qParts) {
                     // Get the key
                     String qKey = qPart;
