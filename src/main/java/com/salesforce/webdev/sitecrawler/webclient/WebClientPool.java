@@ -240,7 +240,7 @@ public class WebClientPool {
             throw new NullPointerException("client cannot be null");
         }
 
-        client.closeAllWindows();
+        client.close();
     }
 
     public void close() {

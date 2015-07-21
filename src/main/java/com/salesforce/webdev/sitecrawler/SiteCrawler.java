@@ -28,6 +28,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -81,6 +82,7 @@ public class SiteCrawler {
      * <p>By default, this contains a default list (/, JSP, HTM and HTML extensions).</p>
      */
     private Collection<String> allowedSuffixes = new ArrayList<String>();
+
     {
         allowedSuffixes.add("/");
         allowedSuffixes.add(".jsp");
@@ -820,6 +822,8 @@ public class SiteCrawler {
                         logger.error("interruped!", e);
                     } catch (ExecutionException e) {
                         logger.error("something went wrong :(", e);
+                    } catch (RejectedExecutionException e) {
+                        logger.warn("Tried to add a ProcessPage [Future: {}], but this was rejected (shutdown in progress?)", result);
                     } finally {
                         if (result != null) {
                             linksScheduled.getAndDecrement();
@@ -958,7 +962,11 @@ public class SiteCrawler {
             }
 
             NavigateThread navigateThread = new NavigateThread(url, this.wcPool);
-            linkService.submit(navigateThread);
+            try {
+                linkService.submit(navigateThread);
+            } catch (RejectedExecutionException e) {
+                logger.warn("Tried to add a NavigateThread for {}, but this was rejected (shutdown in progress?)", url);
+            }
             linksScheduled.getAndIncrement();
 
             visited.add(url);
@@ -1027,8 +1035,7 @@ public class SiteCrawler {
     private void updateCrawlProgress() {
         // int visited = visitedCounter.get();
         int visited = actuallyVisited.get();
-        if ((
-            (visited - visitLogged) > reportProgressPerDownloadedPages && visited > visitLogged)
+        if (((visited - visitLogged) > reportProgressPerDownloadedPages && visited > visitLogged)
             || visitLogged == -1) {
             logger.info(getCrawlProgress());
             visitLogged = visited;

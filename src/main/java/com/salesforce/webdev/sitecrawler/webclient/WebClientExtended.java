@@ -222,7 +222,7 @@ public class WebClientExtended {
             logger
                 .warn(
                     "Out of client sockets [{}] while trying to open '{}', sleeping for {} ms before retrying (attempts left: {})",
-                    e.getClass(), location, timeOut, recoverableErrorRetryCounter);
+                    e.getClass(), location, timeOut, recoverableErrorRetryCounter, e);
             if (null != wcPool) {
                 wc = wcPool.recycleClient(wc);
             }
