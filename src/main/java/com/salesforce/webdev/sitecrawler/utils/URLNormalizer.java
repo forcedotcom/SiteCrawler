@@ -30,6 +30,8 @@ public final class URLNormalizer {
     }
 
     /**
+     * <p><strong> Use {@link #normalize(String, String, String)} for a better resolving experience.</strong></p>
+     * 
      * <p>If #url starts with "/", #base will be prepended.<br />
      * So, if url = <code>"/x"</code> and base is <code>"base.com"</code>, the return value will be
      * <code>"base.com/x"</code>.</p>
@@ -44,7 +46,7 @@ public final class URLNormalizer {
      */
     public static String normalize(String url, String base) {
         url = url.trim();
-        if (url.startsWith("/")) {
+        if (url.startsWith("/") && !url.startsWith("//")) {
             url = base + url;
         }
 
@@ -69,12 +71,21 @@ public final class URLNormalizer {
      */
     public static String normalize(String url, String base, String pageOrigin) {
         url = url.trim();
-        if (url.startsWith("/") || url.startsWith("http://") || url.startsWith("https://")) {
+        if ((url.startsWith("/") && !url.startsWith("//")) || url.startsWith("http://") || url.startsWith("https://")) {
             return normalize(url, base);
         }
-        
+
         if (url.isEmpty() || url.startsWith("tel:") || url.startsWith("#") || url.startsWith("???") || url.startsWith("mailto:")
             || url.startsWith("javascript:")) {
+            return normalize(url, base);
+        }
+
+        // We also need to deal with "//" URLs
+        if (url.startsWith("//")) {
+            // Prepend the protocol of the pageOrigin
+            // This gets the "https:" (or "http:") part and prepends it to create a "https://..." string
+            String pageOriginProtocol = pageOrigin.substring(0, pageOrigin.indexOf("/"));
+            url = pageOriginProtocol + url;
             return normalize(url, base);
         }
 
