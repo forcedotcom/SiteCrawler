@@ -39,6 +39,7 @@ import org.slf4j.LoggerFactory;
 
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.util.Cookie;
+import com.salesforce.webdev.sitecrawler.beans.CrawlProgress;
 import com.salesforce.webdev.sitecrawler.navigation.NavigateThread;
 import com.salesforce.webdev.sitecrawler.navigation.ProcessPage;
 import com.salesforce.webdev.sitecrawler.utils.NamedThreadFactory;
@@ -692,18 +693,33 @@ public class SiteCrawler {
      * @return String a user-friendly message of the progress of the crawler
      */
     public String getCrawlProgress() {
-        int leftToCrawl = toVisit.size() + linksScheduled.get() - threadLimit;
+        CrawlProgress progress = getCrawlProgressBean();
         StringBuilder sb = new StringBuilder();
-        sb.append(actuallyVisited.get()).append(" crawled. ");
-        sb.append(leftToCrawl).append(" left to crawl. ");
-        sb.append(linksScheduled.get()).append(" scheduled for download. "); // (submitted a NavigateThread!)
-        sb.append(pagesScheduled.get()).append(" scheduled for processing. "); // (in LIMBO, downloaded but NOT processed)
-        sb.append(fullyProcessed.get()).append(" fully processed. ");
-        sb.append(Math.round((new Double(fullyProcessed.get()) / (fullyProcessed.get() + leftToCrawl)) * 10000) / 100.0)
-            .append(
-                "% complete.");
-
+        sb.append(progress.crawled).append(" crawled. ");
+        sb.append(progress.leftToCrawl).append(" left to crawl. ");
+        sb.append(progress.scheduledForDownload).append(" scheduled for download. "); // (submitted a NavigateThread!)
+        sb.append(progress.scheduledForProcessing).append(" scheduled for processing. "); // (in LIMBO, downloaded but NOT processed)
+        sb.append(progress.fullyProcessed).append(" fully processed. ");
+        sb.append(progress.complete).append("% complete.");
         return sb.toString();
+    }
+
+    /**
+     * <p>Returns a computer-friendly bean of the progress of the crawler.</p>
+     * 
+     * @return String a computer-friendly bean of the progress of the crawler
+     */
+    public CrawlProgress getCrawlProgressBean() {
+        int leftToCrawl = toVisit.size() + linksScheduled.get() - threadLimit;
+
+        CrawlProgress crawlProgress = new CrawlProgress();
+        crawlProgress.crawled = actuallyVisited.get();
+        crawlProgress.leftToCrawl = leftToCrawl;
+        crawlProgress.scheduledForDownload = linksScheduled.get();
+        crawlProgress.scheduledForProcessing = pagesScheduled.get();
+        crawlProgress.fullyProcessed = fullyProcessed.get();
+        crawlProgress.complete = Math.round((new Double(fullyProcessed.get()) / (fullyProcessed.get() + leftToCrawl)) * 10000) / 100.0;
+        return crawlProgress;
     }
 
     /**
