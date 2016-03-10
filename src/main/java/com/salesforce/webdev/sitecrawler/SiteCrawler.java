@@ -349,7 +349,7 @@ public class SiteCrawler {
      * @param maxProcessWaitingRatio has to be between 0 and 1
      */
     public void setMaxProcessWaitingRatio(double maxProcessWaitingRatio) {
-        if (maxProcessWaitingRatio < 0 || maxProcessWaitingRatio > 1) {
+        if (maxProcessWaitingRatio <= 0 || maxProcessWaitingRatio > 1) {
             throw new IllegalArgumentException("maxProcessWaitingRatio has to be between 0 and 1");
         }
         this.maxProcessWaitingRatio = maxProcessWaitingRatio;
@@ -986,7 +986,10 @@ public class SiteCrawler {
             linksScheduled.getAndIncrement();
 
             visited.add(url);
-            visited.add(getCleanedUrl(url));
+            String cleanUrl = getCleanedUrl(url);
+            if (null != cleanUrl) {
+                visited.add(cleanUrl);
+            }
             visitedCounter.getAndIncrement();
         }
 
