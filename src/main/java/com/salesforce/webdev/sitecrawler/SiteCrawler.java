@@ -574,7 +574,7 @@ public class SiteCrawler {
     }
 
     /**
-     * <p>If you set this, only URLs that have one of these patters will be crawled.</p>
+     * <p>If you set this, only URLs that have one of these patterns will be crawled.</p>
      * 
      * @param allowed Collection of patterns
      */
