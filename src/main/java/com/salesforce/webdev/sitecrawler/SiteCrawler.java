@@ -33,13 +33,16 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.util.Cookie;
 import com.salesforce.webdev.sitecrawler.beans.CrawlProgress;
+import com.salesforce.webdev.sitecrawler.beans.CrawlerConfiguration;
 import com.salesforce.webdev.sitecrawler.navigation.NavigateThread;
 import com.salesforce.webdev.sitecrawler.navigation.ProcessPage;
 import com.salesforce.webdev.sitecrawler.utils.NamedThreadFactory;
@@ -60,7 +63,12 @@ public class SiteCrawler {
     /**
      * <p>Logger</p>
      */
-    private final Logger logger = LoggerFactory.getLogger(SiteCrawler.class);
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+    /**
+     * <p>A unique identifier for this particular Crawler.</p>
+     */
+    private String id;
 
     /**
      * <p>The base URL of the site, preferably the "non-https" version.</p>
@@ -133,13 +141,13 @@ public class SiteCrawler {
      * <p>The factory we use to name the individual threads for the linkExecutor. We keep this as part of the
      * SiteCrawler class in case we "reset" and, so the number will increase with each reset.</p>
      */
-    private final ThreadFactory linkExecutorThreadFactory = new NamedThreadFactory("linkExecutor");
+    private ThreadFactory linkExecutorThreadFactory = new NamedThreadFactory("linkExecutor");
 
     /**
      * <p>The factory we use to name the individual threads for the pageExecutor. We keep this as part of the
      * SiteCrawler class in case we "reset" and, so the number will increase with each reset.</p>
      */
-    private final ThreadFactory pageExecutorThreadFactory = new NamedThreadFactory("pageExecutor");
+    private ThreadFactory pageExecutorThreadFactory = new NamedThreadFactory("pageExecutor");
 
     /**
      * <p>We keep track of the linkExecutor thread in case of a reset or shutdown, so we can wait for it do "die"
@@ -311,6 +319,43 @@ public class SiteCrawler {
         this.baseUrlSecure = baseUrlSecure;
         this.actions = actions;
         parseVMOptions();
+    }
+
+    /**
+     * <p>This allows an end-user to set their own special "ID" for this particular crawl.</p>
+     * 
+     * <p>This will be reflected in the thread names (the ID will be prefixed for all new threads).</p>
+     * 
+     * <p>The slf4j framework will get the ID injected via {@link MDC} with name "crawlId".</p>
+     * 
+     * @param id A non-blank ID (blank IDs will be ignored)
+     */
+    public void setId(String id) {
+        if (StringUtils.isBlank(id)) {
+            return;
+        }
+        this.id = id;
+        MDC.put("crawlId", id);
+        linkExecutorThreadFactory = new NamedThreadFactory(id + "-linkExecutor");
+        pageExecutorThreadFactory = new NamedThreadFactory(id + "-pageExecutor");
+    }
+
+    /**
+     * <p>Return the Id.</p>
+     * 
+     * @return String Id (null if not set)
+     */
+    public String getId() {
+        return id;
+    }
+
+    /**
+     * <p>Return the {@link Logger} for this class.</p>
+     * 
+     * @return {@link Logger} will never be null
+     */
+    public Logger getLogger() {
+        return logger;
     }
 
     /**
@@ -707,7 +752,7 @@ public class SiteCrawler {
     /**
      * <p>Returns a computer-friendly bean of the progress of the crawler.</p>
      * 
-     * @return String a computer-friendly bean of the progress of the crawler
+     * @return CrawlProgress a computer-friendly bean of the progress of the crawler
      */
     public CrawlProgress getCrawlProgressBean() {
         int leftToCrawl = toVisit.size() + linksScheduled.get() - threadLimit;
@@ -720,6 +765,25 @@ public class SiteCrawler {
         crawlProgress.fullyProcessed = fullyProcessed.get();
         crawlProgress.complete = Math.round((new Double(fullyProcessed.get()) / (fullyProcessed.get() + leftToCrawl)) * 10000) / 100.0;
         return crawlProgress;
+    }
+
+    /**
+     * <p>Returns a computer-friendly bean of the configuration of the crawler.</p>
+     * 
+     * @return CrawlerConfiguration a computer-friendly bean of the configuration of the crawler
+     */
+    public CrawlerConfiguration getCrawlerConfiguration() {
+        CrawlerConfiguration crawlerConfiguration = new CrawlerConfiguration();
+        crawlerConfiguration.baseUrl = baseUrl;
+        crawlerConfiguration.baseUrlSecure = baseUrlSecure;
+        crawlerConfiguration.threadLimit = threadLimit;
+        crawlerConfiguration.downloadVsProcessRatio = downloadVsProcessRatio;
+        crawlerConfiguration.maxProcessWaitingRatio = maxProcessWaitingRatio;
+        crawlerConfiguration.maxProcessWaiting = maxProcessWaiting;
+        crawlerConfiguration.shortCircuitAfter = shortCircuitAfter;
+        crawlerConfiguration.disableRedirects = disableRedirects;
+        crawlerConfiguration.enabledJavascript = enabledJavascript;
+        return crawlerConfiguration;
     }
 
     /**
@@ -785,7 +849,7 @@ public class SiteCrawler {
         }
 
         int downloadVsProcessRatio = NumberUtils.toInt(System.getProperty("sc:downloadVsProcessRatio"));
-        if (shortCircuitAfter > 0) {
+        if (downloadVsProcessRatio > 0) {
             setDownloadVsProcessRatio(downloadVsProcessRatio);
         }
     }
@@ -850,7 +914,8 @@ public class SiteCrawler {
         };
         linkServiceConsumer = new Thread(r);
         linkServiceConsumer.setDaemon(false);
-        linkServiceConsumer.setName("linkServiceConsumer");
+        String name = (StringUtils.isNotBlank(id) ? id + "-" + "linkServiceConsumer" : "linkServiceConsumer");
+        linkServiceConsumer.setName(name);
         linkServiceConsumer.start();
     }
 
@@ -921,7 +986,8 @@ public class SiteCrawler {
         };
         pageServiceConsumer = new Thread(r);
         pageServiceConsumer.setDaemon(false);
-        pageServiceConsumer.setName("pageServiceConsumer");
+        String name = (StringUtils.isNotBlank(id) ? id + "-" + "pageServiceConsumer" : "pageServiceConsumer");
+        pageServiceConsumer.setName(name);
         pageServiceConsumer.start();
     }
 
