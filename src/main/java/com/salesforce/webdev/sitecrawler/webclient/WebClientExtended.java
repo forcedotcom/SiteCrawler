@@ -230,6 +230,7 @@ public class WebClientExtended {
                 Thread.sleep(timeOut);
             } catch (InterruptedException ie) {
                 logger.error("Interrupted while waiting for location '{}'", location, ie);
+                Thread.currentThread().interrupt();
                 return false;
             }
             logger.info("Done sleeping, rescheduling location '{}'", location);
