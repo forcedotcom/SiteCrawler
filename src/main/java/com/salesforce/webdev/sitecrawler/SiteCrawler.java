@@ -1065,7 +1065,7 @@ public class SiteCrawler {
             try {
                 linkService.submit(navigateThread);
             } catch (RejectedExecutionException e) {
-                logger.warn("Tried to add a NavigateThread for {}, but this was rejected (shutdown in progress?)", url);
+                logger.warn("Tried to add a NavigateThread for {}, but this was rejected (shutdown in progress?)", url, e);
             }
             linksScheduled.getAndIncrement();
 
