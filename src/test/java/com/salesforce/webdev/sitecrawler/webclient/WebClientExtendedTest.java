@@ -15,9 +15,10 @@ public class WebClientExtendedTest {
      * 
      * @throws IOException
      * @throws InterruptedException
+     * @throws WebClientPoolClosedException 
      */
     //    @Test
-    public void testCache() throws IOException, InterruptedException {
+    public void testCache() throws IOException, InterruptedException, WebClientPoolClosedException {
         String url = "http://www.sfdcstatic.com/common/assets/img/logo-company.png";
 
         // Use "1" to restrict the pool to a single crawler

@@ -179,11 +179,12 @@ public class WebClientPool {
      * <p>Will block if there are no clients currently.</p>
      * 
      * @return A WebClient (will not be null)
-     * @throws InterruptedException
+     * @throws InterruptedException Can be thrown by the Queue that holds the {@link WebClientExtended}
+     * @throws WebClientPoolClosedException Thrown in case the pool is closed (via {@link #close()})
      */
-    public WebClientExtended takeClient() throws InterruptedException {
+    public WebClientExtended takeClient() throws InterruptedException, WebClientPoolClosedException {
         if (closed) {
-            throw new RuntimeException("pool " + name + " is closed, cannot take new clients!");
+            throw new WebClientPoolClosedException("pool " + name + " is closed, cannot take new clients!");
         }
         takeCounter.incrementAndGet();
         return wcPool.take();
