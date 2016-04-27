@@ -92,13 +92,6 @@ public class SiteCrawler {
      */
     private Collection<String> allowedSuffixes = new ArrayList<String>();
 
-    {
-        allowedSuffixes.add("/");
-        allowedSuffixes.add(".jsp");
-        allowedSuffixes.add(".htm");
-        allowedSuffixes.add(".html");
-    }
-
     private Collection<String> allowedParameters = new ArrayList<String>();
 
     /**
@@ -319,6 +312,7 @@ public class SiteCrawler {
         this.baseUrlSecure = baseUrlSecure;
         this.actions = actions;
         parseVMOptions();
+        addDefaultAllowedSuffixes();
     }
 
     /**
@@ -691,6 +685,7 @@ public class SiteCrawler {
                 linkExecutor.awaitTermination(2, TimeUnit.MINUTES);
             } catch (InterruptedException e) {
                 logger.error("Something happened while waiting for linkExecutor to be shutdown", e);
+                Thread.currentThread().interrupt();
             }
         }
 
@@ -700,6 +695,7 @@ public class SiteCrawler {
                 pageExecutor.awaitTermination(2, TimeUnit.MINUTES);
             } catch (InterruptedException e) {
                 logger.error("Something happened while waiting for pageExecutor to be shutdown", e);
+                Thread.currentThread().interrupt();
             }
         }
 
@@ -714,6 +710,7 @@ public class SiteCrawler {
                     Thread.sleep(TimeUnit.SECONDS.toMillis(5));
                 } catch (InterruptedException e) {
                     logger.error("Something happened while waiting for linkServiceConsumer to be shutdown", e);
+                    Thread.currentThread().interrupt();
                 }
             }
             logger.info("... linkServiceConsumer thread is dead");
@@ -726,6 +723,7 @@ public class SiteCrawler {
                     Thread.sleep(TimeUnit.SECONDS.toMillis(5));
                 } catch (InterruptedException e) {
                     logger.error("Something happened while waiting for pageServiceConsumer to be shutdown", e);
+                    Thread.currentThread().interrupt();
                 }
             }
             logger.info("... pageServiceConsumer thread is dead");
@@ -808,7 +806,7 @@ public class SiteCrawler {
         linkExecutor = Executors.newFixedThreadPool(threadLimit, linkExecutorThreadFactory);
         linkService = new ExecutorCompletionService<ProcessPage>(linkExecutor);
 
-        int pageExecutorSize = new Double(Math.ceil(threadLimit * downloadVsProcessRatio)).intValue();
+        int pageExecutorSize = (int) Math.ceil(threadLimit * downloadVsProcessRatio);
         pageExecutor = Executors.newFixedThreadPool(pageExecutorSize, pageExecutorThreadFactory);
         pageService = new ExecutorCompletionService<Collection<String>>(pageExecutor);
 
@@ -855,6 +853,18 @@ public class SiteCrawler {
     }
 
     /**
+     * <p>This is the collection of default suffixes allowed by the crawler on the web.</p>
+     * 
+     * <p>End-users can add more via {@link #addAllowedSuffixes(Collection)}).</p>
+     */
+    private void addDefaultAllowedSuffixes() {
+        allowedSuffixes.add("/");
+        allowedSuffixes.add(".jsp");
+        allowedSuffixes.add(".htm");
+        allowedSuffixes.add(".html");
+    }
+
+    /**
      * <p>The linkService takes the pages that are scheduled to be visited and executes.</p>
      * 
      * <p>After downloading the page, we submit the result to the {@link #pageService} to be processed.</p>
@@ -878,6 +888,7 @@ public class SiteCrawler {
                         }
                     } catch (InterruptedException e) {
                         logger.error("startLinkServiceConsumer got interrupted, stopping...");
+                        Thread.currentThread().interrupt();
                         return;
                     }
 
@@ -899,11 +910,12 @@ public class SiteCrawler {
                         pageService.submit(processPage);
                         pagesScheduled.getAndIncrement();
                     } catch (InterruptedException e) {
-                        logger.error("interruped!", e);
+                        logger.error("interruped while trying to work with result {}", result, e);
+                        Thread.currentThread().interrupt();
                     } catch (ExecutionException e) {
-                        logger.error("something went wrong :(", e);
+                        logger.error("something went wrong trying to work with result {} :(", result, e);
                     } catch (RejectedExecutionException e) {
-                        logger.warn("Tried to add a ProcessPage [Future: {}], but this was rejected (shutdown in progress?)", result);
+                        logger.warn("Tried to add a ProcessPage [Future: {}], but this was rejected (shutdown in progress?)", result, e);
                     } finally {
                         if (result != null) {
                             linksScheduled.getAndDecrement();
@@ -924,6 +936,7 @@ public class SiteCrawler {
      */
     private void waitForLinkServiceConsumer() {
         logger.info("Shutting down LinkServiceConsumer");
+        final int secondsToWaitBetweenChecks = 5;
         while (linksScheduled.get() > 0) {
             logger.info("Waiting for {} links to be consumed...", linksScheduled.get());
 
@@ -933,9 +946,10 @@ public class SiteCrawler {
             }
 
             try {
-                Thread.sleep(TimeUnit.SECONDS.toMillis(5));
+                Thread.sleep(TimeUnit.SECONDS.toMillis(secondsToWaitBetweenChecks));
             } catch (InterruptedException e) {
-                logger.error("Interruped :(", e);
+                logger.error("Interruped while waiting {} seconds for the links to be consumed, stopping :(", secondsToWaitBetweenChecks, e);
+                Thread.currentThread().interrupt();
                 return;
             }
         }
@@ -972,9 +986,10 @@ public class SiteCrawler {
                             toVisit.put(newToVisit);
                         }
                     } catch (InterruptedException e) {
-                        logger.error("interruped!", e);
+                        logger.error("interruped while trying to work with result {}", result, e);
+                        Thread.currentThread().interrupt();
                     } catch (ExecutionException e) {
-                        logger.error("something went wrong :(", e);
+                        logger.error("something went wrong trying to work with result {}:(", result, e);
                     } finally {
                         if (result != null) {
                             fullyProcessed.getAndIncrement();
@@ -996,6 +1011,7 @@ public class SiteCrawler {
      */
     private void waitForPageServiceConsumer() {
         logger.info("Shutting down PageServiceConsumer");
+        final int secondsToWaitBetweenChecks = 5;
         while (pagesScheduled.get() > 0) {
             logger.info("Waiting for {} pages to be consumed...", pagesScheduled.get());
 
@@ -1005,9 +1021,10 @@ public class SiteCrawler {
             }
 
             try {
-                Thread.sleep(TimeUnit.SECONDS.toMillis(5));
+                Thread.sleep(TimeUnit.SECONDS.toMillis(secondsToWaitBetweenChecks));
             } catch (InterruptedException e) {
-                logger.error("Interruped :(", e);
+                logger.error("Interruped while waiting {} seconds for the links to be consumed, stopping :(", secondsToWaitBetweenChecks, e);
+                Thread.currentThread().interrupt();
                 return;
             }
         }
@@ -1034,6 +1051,7 @@ public class SiteCrawler {
                 url = prependBaseUrlIfNeeded(url);
             } catch (InterruptedException e) {
                 logger.error("We were interrupted waiting for the next link, exiting...", e);
+                Thread.currentThread().interrupt();
                 return;
             }
 
@@ -1047,7 +1065,7 @@ public class SiteCrawler {
             try {
                 linkService.submit(navigateThread);
             } catch (RejectedExecutionException e) {
-                logger.warn("Tried to add a NavigateThread for {}, but this was rejected (shutdown in progress?)", url);
+                logger.warn("Tried to add a NavigateThread for {}, but this was rejected (shutdown in progress?)", url, e);
             }
             linksScheduled.getAndIncrement();
 

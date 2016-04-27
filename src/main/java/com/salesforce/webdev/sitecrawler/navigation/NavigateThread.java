@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import com.gargoylesoftware.htmlunit.Page;
 import com.salesforce.webdev.sitecrawler.webclient.WebClientExtended;
 import com.salesforce.webdev.sitecrawler.webclient.WebClientPool;
+import com.salesforce.webdev.sitecrawler.webclient.WebClientPoolClosedException;
 
 /**
  * <p>This is a fairly simple Runnable (actually a Callable, so it can be used as part of an Executor).</p>
@@ -88,6 +89,9 @@ public class NavigateThread implements Callable<ProcessPage> {
                 return result;
             }
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new NavigateThreadException(e);
+        } catch (WebClientPoolClosedException e) {
             throw new NavigateThreadException(e);
         } finally {
             if (null != wc) {
