@@ -910,12 +910,12 @@ public class SiteCrawler {
                         pageService.submit(processPage);
                         pagesScheduled.getAndIncrement();
                     } catch (InterruptedException e) {
-                        logger.error("interruped while trying to work with result {}", result, e);
+                        logger.error("[startLinkServiceConsumer] Interruped while trying to work with result {}", result, e);
                         Thread.currentThread().interrupt();
                     } catch (ExecutionException e) {
-                        logger.error("something went wrong trying to work with result {} :(", result, e);
+                        logger.error("[startLinkServiceConsumer] Something went wrong trying to work with result {}", result, e);
                     } catch (RejectedExecutionException e) {
-                        logger.warn("Tried to add a ProcessPage [Future: {}], but this was rejected (shutdown in progress?)", result, e);
+                        logger.warn("[startLinkServiceConsumer] Tried to add a ProcessPage [Future: {}], but this was rejected (shutdown in progress?)", result, e);
                     } finally {
                         if (result != null) {
                             linksScheduled.getAndDecrement();
@@ -986,10 +986,10 @@ public class SiteCrawler {
                             toVisit.put(newToVisit);
                         }
                     } catch (InterruptedException e) {
-                        logger.error("interruped while trying to work with result {}", result, e);
+                        logger.error("[startPageServiceConsumer] Interruped while trying to work with result {}", result, e);
                         Thread.currentThread().interrupt();
                     } catch (ExecutionException e) {
-                        logger.error("something went wrong trying to work with result {}:(", result, e);
+                        logger.error("[startPageServiceConsumer] Something went wrong trying to work with result {}", result, e);
                     } finally {
                         if (result != null) {
                             fullyProcessed.getAndIncrement();
