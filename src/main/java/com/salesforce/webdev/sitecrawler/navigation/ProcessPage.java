@@ -11,7 +11,9 @@
  ******************************************************************************/
 package com.salesforce.webdev.sitecrawler.navigation;
 
+import java.net.SocketException;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -26,16 +28,20 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import javax.net.ssl.SSLException;
 
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.gargoylesoftware.htmlunit.FailingHttpStatusCodeException;
 import com.gargoylesoftware.htmlunit.Page;
+import com.gargoylesoftware.htmlunit.WebResponse;
+import com.gargoylesoftware.htmlunit.WebResponseData;
 import com.gargoylesoftware.htmlunit.html.DomElement;
 import com.gargoylesoftware.htmlunit.html.DomNodeList;
 import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.salesforce.webdev.sitecrawler.SiteCrawlerAction;
+import com.salesforce.webdev.sitecrawler.SiteCrawlerErrorCodes;
 import com.salesforce.webdev.sitecrawler.utils.URLNormalizer;
 
 /**
@@ -151,8 +157,30 @@ public class ProcessPage implements Callable<Collection<String>> {
             return;
         }
 
-        if (page.getWebResponse().getContentAsString().length() == 0) {
-            handleEmptyPage();
+        if (null == page) {
+            logger.error("page cannot be null for location {}", location);
+            handleGenericError(SiteCrawlerErrorCodes.PAGEOBJECT_COULD_NOT_BE_FOUND.getErrorCode());
+            return;
+        }
+
+        WebResponse webResponse = page.getWebResponse();
+        if (null == webResponse) {
+            logger.error("webResponse null for page {} and location {}", page, location);
+            handleGenericError(SiteCrawlerErrorCodes.WEBRESPONSE_COULD_NOT_BE_FOUND.getErrorCode());
+            return;
+        }
+
+        String contentString = webResponse.getContentAsString();
+        if (null == contentString) {
+            logger.error("contentString null for webResponse {}, page {} and location {}."
+                + "This is likely preceded with 2 WARN level messages about FileNotFoundExceptions...", webResponse, page, location);
+            handleGenericError(SiteCrawlerErrorCodes.CONTENTSTRING_COULD_NOT_BE_FOUND.getErrorCode());
+            return;
+        }
+
+        // In case of no content, call this method. It will treat the empty page as a "410 Gone" response.
+        if (contentString.isEmpty()) {
+            handleGenericError(SiteCrawlerErrorCodes.HTTP_GONE.getErrorCode());
             return;
         }
 
@@ -238,12 +266,14 @@ public class ProcessPage implements Callable<Collection<String>> {
         }
     }
 
-    /**
-     * <p>In case of no content, call this method. It will treat the empty page as a "410 Gone" response.</p>
-     */
-    private void handleEmptyPage() {
+    private void handleGenericError(int errorCode) {
+        WebResponse webResponse = null;
+        if (null != page) {
+            webResponse = page.getWebResponse();
+        }
+
         for (SiteCrawlerAction sca : actions) {
-            sca.handleError(410, location, urlFrom.get(location), page.getWebResponse());
+            sca.handleError(errorCode, location, urlFrom.get(location), webResponse);
         }
     }
 
@@ -259,8 +289,15 @@ public class ProcessPage implements Callable<Collection<String>> {
             return;
         }
 
-        logger.error("Unknown page type {} with Content-Type {} for url {} with content: {}", new Object[] {
-            page.getClass().getName(), contentType, location, page.getWebResponse().getContentAsString() });
+        // We only log the content is debug is enabled
+        if (logger.isDebugEnabled()) {
+            logger.error("Unknown page type {} with Content-Type {} for url {} with content: {}", new Object[] {
+                page.getClass().getName(), contentType, location, page.getWebResponse().getContentAsString() });
+        } else {
+            logger.error("Unknown page type {} with Content-Type {} for url {}", new Object[] {
+                page.getClass().getName(), contentType, location });
+
+        }
     }
 
     /**
@@ -277,6 +314,15 @@ public class ProcessPage implements Callable<Collection<String>> {
             }
         } else if (exception instanceof SSLException) {
             logger.error("SSLException at {}", location, exception);
+        } else if (exception instanceof SocketException) {
+            if ("Connection reset".equals(exception.getMessage())) {
+                handleGenericError(SiteCrawlerErrorCodes.SOCKET_EXCEPTION_CONNECTION_RESET.getErrorCode());
+            } else {
+                logger.error("SocketException (handled) at {}", location, exception);
+                handleGenericError(SiteCrawlerErrorCodes.SOCKET_EXCEPTION.getErrorCode());
+            }
+        } else if (exception instanceof UnknownHostException) {
+            handleGenericException(SiteCrawlerErrorCodes.UNKNOWN_HOST_EXCEPTION.getErrorCode(), exception);
         } else {
             logger.error("Unhandled exception on page '{}'", location, exception);
         }
@@ -290,6 +336,16 @@ public class ProcessPage implements Callable<Collection<String>> {
     private void handleFailingHttpStatusCodeException(FailingHttpStatusCodeException e) {
         for (SiteCrawlerAction sca : actions) {
             sca.handleError(e.getStatusCode(), location, urlFrom.get(location), e.getResponse());
+        }
+    }
+
+    private void handleGenericException(int statusCode, Throwable t) {
+        WebResponseData webResponseData = new WebResponseData(
+            ExceptionUtils.getFullStackTrace(t).getBytes(), statusCode, ExceptionUtils.getMessage(t),
+            null);
+        WebResponse webResponse = new WebResponse(webResponseData, null, 0);
+        for (SiteCrawlerAction sca : actions) {
+            sca.handleError(statusCode, location, urlFrom.get(location), webResponse);
         }
     }
 
