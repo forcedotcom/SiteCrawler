@@ -46,7 +46,7 @@ public interface SiteCrawlerAction {
      * [410 Gone]!).
      * 
      * @param errorcode The statuscode as returned by the server (usually a non-200 code)
-     * @param url The URL that was being visited when the errocode was returned
+     * @param url The URL that was being visited when the errorcode was returned
      * @param from the "referrer"(s) if it/they exist
      * @param response The content of the error page
      */
