@@ -23,6 +23,8 @@ import org.slf4j.LoggerFactory;
  */
 public final class URLNormalizer {
 
+    private static Logger logger = LoggerFactory.getLogger(URLNormalizer.class);
+
     /**
      * <p>Private to prevent instantiation.</p>
      */
@@ -56,8 +58,6 @@ public final class URLNormalizer {
 
         return url;
     }
-
-    private static Logger logger = LoggerFactory.getLogger(URLNormalizer.class);
 
     /**
      * <p>If this is already a "normal" URL (starts with an HTTP protocol or a /", we call {@link #normalize(String, String)}.</p>
