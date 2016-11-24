@@ -4,7 +4,7 @@
 
 	<groupId>com.salesforce.webdev</groupId>
 	<artifactId>SiteCrawler</artifactId>
-	<version>0.0.7-SNAPSHOT</version>
+	<version>0.0.8-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
 	<name>SiteCrawler</name>
@@ -16,7 +16,7 @@ It also allow for setting &quot;blocked&quot; URLs. Those URLs or patterns will 
 	<inceptionYear>Feb 1, 2014</inceptionYear>
 	<organization>
 		<name>Salesforce.com</name>
-		<url>http://www.salesforce.com</url>
+		<url>https://www.salesforce.com</url>
 	</organization>
 	<scm>
 		<url>https://github.com/forcedotcom/SiteCrawler</url>
