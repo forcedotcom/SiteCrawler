@@ -169,5 +169,3 @@ The BSD 2-Clause License
 http://opensource.org/licenses/BSD-2-Clause
 
 See [LICENSE.txt](./LICENSE.txt)
-
-[![githalytics.com alpha](https://cruel-carlota.pagodabox.com/e670ba9297b3b8ef1bac20cda8069aa3 "githalytics.com")](http://githalytics.com/forcedotcom/SiteCrawler)
