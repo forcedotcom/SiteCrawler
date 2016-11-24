@@ -11,8 +11,6 @@
  ******************************************************************************/
 package com.salesforce.webdev.sitecrawler;
 
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -46,11 +44,11 @@ import com.salesforce.webdev.sitecrawler.beans.CrawlerConfiguration;
 import com.salesforce.webdev.sitecrawler.navigation.NavigateThread;
 import com.salesforce.webdev.sitecrawler.navigation.ProcessPage;
 import com.salesforce.webdev.sitecrawler.utils.NamedThreadFactory;
+import com.salesforce.webdev.sitecrawler.utils.URLCleaner;
 import com.salesforce.webdev.sitecrawler.webclient.WebClientPool;
 
 /**
- * <p>This class is the central hub and referee between our network spider (NavigateThread) and our page (/HTML) parser
- * (ProcessPage).</p>
+ * <p>This class is the central hub and referee between our network spider (NavigateThread) and our page (/HTML) parser (ProcessPage).</p>
  * 
  * <p>It controls a pool of WebClients, which are used by the NavigateThread to spider the site.</p>
  * 
@@ -92,11 +90,8 @@ public class SiteCrawler {
      */
     private Collection<String> allowedSuffixes = new ArrayList<String>();
 
-    private Collection<String> allowedParameters = new ArrayList<String>();
-
     /**
-     * <p>Some sites don't use suffixes. This allows turning that off.
-     * Otherwise, only pages in {@link #allowedSuffixes} are allowed.</p>
+     * <p>Some sites don't use suffixes. This allows turning that off. Otherwise, only pages in {@link #allowedSuffixes} are allowed.</p>
      */
     private boolean requireAllowedSuffixes = true;
 
@@ -131,26 +126,24 @@ public class SiteCrawler {
     private int threadLimit = Runtime.getRuntime().availableProcessors();
 
     /**
-     * <p>The factory we use to name the individual threads for the linkExecutor. We keep this as part of the
-     * SiteCrawler class in case we "reset" and, so the number will increase with each reset.</p>
+     * <p>The factory we use to name the individual threads for the linkExecutor. We keep this as part of the SiteCrawler class in case we "reset" and, so the number will increase
+     * with each reset.</p>
      */
     private ThreadFactory linkExecutorThreadFactory = new NamedThreadFactory("linkExecutor");
 
     /**
-     * <p>The factory we use to name the individual threads for the pageExecutor. We keep this as part of the
-     * SiteCrawler class in case we "reset" and, so the number will increase with each reset.</p>
+     * <p>The factory we use to name the individual threads for the pageExecutor. We keep this as part of the SiteCrawler class in case we "reset" and, so the number will increase
+     * with each reset.</p>
      */
     private ThreadFactory pageExecutorThreadFactory = new NamedThreadFactory("pageExecutor");
 
     /**
-     * <p>We keep track of the linkExecutor thread in case of a reset or shutdown, so we can wait for it do "die"
-     * properly.</p>
+     * <p>We keep track of the linkExecutor thread in case of a reset or shutdown, so we can wait for it do "die" properly.</p>
      */
     private Thread linkServiceConsumer;
 
     /**
-     * <p>We keep track of the pageExecutor thread in case of a reset or shutdown, so we can wait for it do "die"
-     * properly.</p>
+     * <p>We keep track of the pageExecutor thread in case of a reset or shutdown, so we can wait for it do "die" properly.</p>
      */
     private Thread pageServiceConsumer;
 
@@ -169,8 +162,7 @@ public class SiteCrawler {
     private double maxProcessWaitingRatio = 0.4;
 
     /**
-     * <p>If there are more pages then this waiting to be processing, we pause the crawling to avoid exhausting the
-     * memory.</p>
+     * <p>If there are more pages then this waiting to be processing, we pause the crawling to avoid exhausting the memory.</p>
      * 
      * <p>Keep in mind that each page/process waiting costs about 1Mb in memory. So, a value of 500 means a <em>heap requirement of 500Mb</em>.</p>
      * 
@@ -194,9 +186,8 @@ public class SiteCrawler {
     private CompletionService<ProcessPage> linkService;
 
     /**
-     * <p>This Executor determines how many downloaded pages we should process in parallel. The number is set by this
-     * simple rule:<br />
-     * <code>thread limit = {@link #threadLimit} * {@link #downloadVsProcessRatio}</code></p>
+     * <p>This Executor determines how many downloaded pages we should process in parallel. The number is set by this simple rule:<br /> <code>thread limit = {@link #threadLimit} *
+     * {@link #downloadVsProcessRatio}</code></p>
      */
     private ExecutorService pageExecutor;
     /**
@@ -227,8 +218,7 @@ public class SiteCrawler {
     private AtomicInteger actuallyVisited = new AtomicInteger();
 
     /**
-     * <p>Internal counter to count how many pages have been downloaded an fully processed.</p>
-     * (This is different from actuallyVisited, since that decreases too!)
+     * <p>Internal counter to count how many pages have been downloaded an fully processed.</p> (This is different from actuallyVisited, since that decreases too!)
      */
     private AtomicInteger fullyProcessed = new AtomicInteger();
 
@@ -242,20 +232,17 @@ public class SiteCrawler {
     private volatile boolean continueProcessing = true;
 
     /**
-     * <p>If this is set to false, it tells all the {@link NavigateThread}s to stop finding new URLs (basically; to stop
-     * crawling new pages).</p>
+     * <p>If this is set to false, it tells all the {@link NavigateThread}s to stop finding new URLs (basically; to stop crawling new pages).</p>
      */
     private boolean discoverUrls = true;
 
     /**
-     * <p>This is a handy parameter which stops all crawling once the amount of crawls is equal or higher to the value
-     * this is set to.</p>
+     * <p>This is a handy parameter which stops all crawling once the amount of crawls is equal or higher to the value this is set to.</p>
      */
     private int shortCircuitAfter = 0;
 
     /**
-     * <p>visitLogged is used to make sure we don't print the same "visited" messages twice.</p>
-     * <p>Basically, it's a counter :-). Used by {@link #updateCrawlProgress()}</p>
+     * <p>visitLogged is used to make sure we don't print the same "visited" messages twice.</p> <p>Basically, it's a counter :-). Used by {@link #updateCrawlProgress()}</p>
      */
     private int visitLogged = -1;
 
@@ -278,34 +265,27 @@ public class SiteCrawler {
     private boolean forcePause = false;
 
     /**
-     * <p>Set up the SiteCrawler, initiate the WebClient (default values: no javascript, CSS, use insecure SSL and
-     * thrown exceptions of it finds a failing Status Code).</p>
+     * <p>Set up the SiteCrawler, initiate the WebClient (default values: no javascript, CSS, use insecure SSL and thrown exceptions of it finds a failing Status Code).</p>
      * 
      * <p>This also sets up the a pool of {@link WebClient}s, based on {@link #threadLimit}.</p>
      * 
-     * @param baseUrl The base Url, starting with the protocol, NOT ending with a / (so: "http://www.site.com").
-     *            Cannot be null
-     * @param baseUrlSecure The base secure Url, starting with the protocol, NOT ending with a / (so:
-     *            "https://www.site.com"). Can be null
-     * @param actions list of {@link SiteCrawlerAction}s, these are the actions that will be called, either when an
-     *            Exception happens, or when any page is successfully loaded
+     * @param baseUrl The base Url, starting with the protocol, NOT ending with a / (so: "http://www.site.com"). Cannot be null
+     * @param baseUrlSecure The base secure Url, starting with the protocol, NOT ending with a / (so: "https://www.site.com"). Can be null
+     * @param actions list of {@link SiteCrawlerAction}s, these are the actions that will be called, either when an Exception happens, or when any page is successfully loaded
      */
     public SiteCrawler(String baseUrl, String baseUrlSecure, SiteCrawlerAction... actions) {
         this(baseUrl, baseUrlSecure, Collections.unmodifiableList(Arrays.asList(actions)));
     }
 
     /**
-     * <p>Set up the SiteCrawler, initiate the WebClient (default values: no javascript, CSS, use insecure SSL and
-     * thrown exceptions of it finds a failing Status Code).</p>
+     * <p>Set up the SiteCrawler, initiate the WebClient (default values: no javascript, CSS, use insecure SSL and thrown exceptions of it finds a failing Status Code).</p>
      * 
      * <p>This also sets up the a pool of {@link WebClient}s, based on {@link #threadLimit}.</p>
      * 
-     * @param baseUrl The base Url, starting with the protocol, NOT ending with a / (so: "http://www.site.com").
-     *            Cannot be null
-     * @param baseUrlSecure The base secure Url, starting with the protocol, NOT ending with a / (so:
-     *            "https://www.site.com"). Can be null
-     * @param actions {@link List} of {@link SiteCrawlerAction}s, these are the actions that will be called, either when
-     *            an Exception happens, or when any page is successfully loaded
+     * @param baseUrl The base Url, starting with the protocol, NOT ending with a / (so: "http://www.site.com"). Cannot be null
+     * @param baseUrlSecure The base secure Url, starting with the protocol, NOT ending with a / (so: "https://www.site.com"). Can be null
+     * @param actions {@link List} of {@link SiteCrawlerAction}s, these are the actions that will be called, either when an Exception happens, or when any page is successfully
+     *            loaded
      */
     public SiteCrawler(String baseUrl, String baseUrlSecure, List<? extends SiteCrawlerAction> actions) {
         this.baseUrl = baseUrl;
@@ -355,8 +335,7 @@ public class SiteCrawler {
     /**
      * <p>Sets the threadLimit.</p>
      * 
-     * <p>Determines the amount of I/O threads used for crawling) and (based on downloadVsProcessRatio) the amount of
-     * threads for processing downloaded pages.</p>
+     * <p>Determines the amount of I/O threads used for crawling) and (based on downloadVsProcessRatio) the amount of threads for processing downloaded pages.</p>
      * 
      * <p><strong>NOTE</strong>: calling this while the crawler is running cause a reset (see {@link #reset()}.</p>
      * 
@@ -424,8 +403,7 @@ public class SiteCrawler {
     }
 
     /**
-     * <p>This will cause a {@link #pause()} and wait until all the queues to be empty. Afterwards, it will shut down
-     * all the page and link consumer threads.</p>
+     * <p>This will cause a {@link #pause()} and wait until all the queues to be empty. Afterwards, it will shut down all the page and link consumer threads.</p>
      */
     public void hardPause() {
         pause();
@@ -448,8 +426,7 @@ public class SiteCrawler {
     }
 
     /**
-     * <p>Add the Collection to the list of pages to be crawled. This will NOT add any links that are either excluded or
-     * already scheduled to be visited.</p>
+     * <p>Add the Collection to the list of pages to be crawled. This will NOT add any links that are either excluded or already scheduled to be visited.</p>
      * 
      * @param paths The collection of pages to be visited (Please make sure they are unique!)
      */
@@ -467,8 +444,7 @@ public class SiteCrawler {
     }
 
     /**
-     * <p>Set the limit on amount of pages in the queue to be processed. The crawler pauses to avoid exhausting memory
-     * (for example).</p>
+     * <p>Set the limit on amount of pages in the queue to be processed. The crawler pauses to avoid exhausting memory (for example).</p>
      * 
      * @param maxProcessWaiting int
      */
@@ -489,9 +465,8 @@ public class SiteCrawler {
     }
 
     /**
-     * <p>If there is a "shortCircuitAfter" set, we stop all navigation after
-     * we have reached that many items. This is basically a way to say "stop after X visits". <br />
-     * This is very useful for debugging or when you don't want to wait for the whole thing to end.</p>
+     * <p>If there is a "shortCircuitAfter" set, we stop all navigation after we have reached that many items. This is basically a way to say "stop after X visits". <br /> This is
+     * very useful for debugging or when you don't want to wait for the whole thing to end.</p>
      * 
      * @return int shortCircuitAfter
      */
@@ -500,9 +475,8 @@ public class SiteCrawler {
     }
 
     /**
-     * <p>If there is a "shortCircuitAfter" set, we stop all navigation after
-     * we have reached that many items. This is basically a way to say "stop after X visits".
-     * This is very useful for debugging or when you don't want to wait for the whole thing to end.</p>
+     * <p>If there is a "shortCircuitAfter" set, we stop all navigation after we have reached that many items. This is basically a way to say "stop after X visits". This is very
+     * useful for debugging or when you don't want to wait for the whole thing to end.</p>
      * 
      * <p>A negative number is unsupported, and will likely result in no visits at all!</p>
      * 
@@ -513,8 +487,7 @@ public class SiteCrawler {
     }
 
     /**
-     * <p>If this is called, it tells all the {@link NavigateThread}s to stop finding new URLs (basically; to stop
-     * crawling new pages).</p>
+     * <p>If this is called, it tells all the {@link NavigateThread}s to stop finding new URLs (basically; to stop crawling new pages).</p>
      */
     public void disableCrawling() {
         discoverUrls = false;
@@ -552,17 +525,10 @@ public class SiteCrawler {
         this.requireAllowedSuffixes = requireAllowedSuffixes;
     }
 
-    public void setAllowedParameters(final Collection<String> parameters) {
-        this.allowedParameters.clear();
-        this.allowedParameters.addAll(parameters);
-    }
+    private URLCleaner urlCleaner = new URLCleaner();
 
-    public void addAllowedParameters(final String parameter) {
-        this.allowedParameters.add(parameter);
-    }
-
-    public void removeAllowedParameter(final String parameter) {
-        this.allowedParameters.remove(parameter);
+    public URLCleaner getUrlCleaner() {
+        return urlCleaner;
     }
 
     /**
@@ -629,8 +595,8 @@ public class SiteCrawler {
     /**
      * <p>Return the collection of extensions to be parsed.</p>
      * 
-     * <p>This collection is backed by the collection used by the crawler, feel free to manipulate.<br />
-     * <strong>NOTE</strong>Please do not manipulate after starting the crawler.</p>
+     * <p>This collection is backed by the collection used by the crawler, feel free to manipulate.<br /> <strong>NOTE</strong>Please do not manipulate after starting the
+     * crawler.</p>
      * 
      * @return {@link Collection} of String.
      */
@@ -1070,7 +1036,7 @@ public class SiteCrawler {
             linksScheduled.getAndIncrement();
 
             visited.add(url);
-            String cleanUrl = getCleanedUrl(url);
+            String cleanUrl = urlCleaner.getCleanedUrl(url);
             if (null != cleanUrl) {
                 visited.add(cleanUrl);
             }
@@ -1114,13 +1080,10 @@ public class SiteCrawler {
         // This is very useful for debugging or when you don't want to wait for the whole thing to end
         logger.trace("Current shortcicruit setting: {}, visitedCounter: {}", shortCircuitAfter, visitedCounter.get());
         if (shortCircuitAfter != 0 && visitedCounter.get() > shortCircuitAfter) {
-            logger
-                .info(
-                    "A shortcircuit was set (at {}) and has been triggered after {} visited pages. Stopping this crawl for that reason.",
-                    shortCircuitAfter, visitedCounter.get());
+            logger.info("A shortcircuit was set (at {}) and has been triggered after {} visited pages. Stopping this crawl for that reason.", shortCircuitAfter,
+                    visitedCounter.get());
             logger.warn("If you see a shortcircuit message (this one) in a production environment/build, "
-                + "it is likely that somebody forgot to remove a debug \".setShortCircuit\" call. "
-                + "Please report this if found.");
+                    + "it is likely that somebody forgot to remove a debug \".setShortCircuit\" call. " + "Please report this if found.");
             return false;
         }
 
@@ -1138,8 +1101,7 @@ public class SiteCrawler {
     private void updateCrawlProgress() {
         // int visited = visitedCounter.get();
         int visited = actuallyVisited.get();
-        if (((visited - visitLogged) > reportProgressPerDownloadedPages && visited > visitLogged)
-            || visitLogged == -1) {
+        if (((visited - visitLogged) > reportProgressPerDownloadedPages && visited > visitLogged) || visitLogged == -1) {
             logger.info(getCrawlProgress());
             visitLogged = visited;
         }
@@ -1177,13 +1139,8 @@ public class SiteCrawler {
     /**
      * <p>Will return true if the URL is <strong>excluded</strong> from crawling.</p>
      * 
-     * <p>Usually this means:
-     * <ul>
-     * <li>The URL is outside of one of the base URLs.</li>
-     * <li>The URL has been visited before by this crawler.</li>
-     * <li>The URL doesn't look like a crawlable page (only <code>#hasAllowedSuffix</code> are crawlable).</li>
-     * </ul>
-     * </p>
+     * <p>Usually this means: <ul> <li>The URL is outside of one of the base URLs.</li> <li>The URL has been visited before by this crawler.</li> <li>The URL doesn't look like a
+     * crawlable page (only <code>#hasAllowedSuffix</code> are crawlable).</li> </ul> </p>
      * 
      * @param url A full url (should include the protocol part, eg "http://foo.bar/page/")
      * @return true if it's excluded, false otherwise
@@ -1256,69 +1213,13 @@ public class SiteCrawler {
         }
 
         // Also check the cleaned URL
-        String cleanUrl = getCleanedUrl(url);
+        String cleanUrl = urlCleaner.getCleanedUrl(url);
         if (null != cleanUrl && visited.contains(cleanUrl)) {
             logger.trace("The cleaned URL is blocked [{}], skipping it.", url);
             return true;
         }
 
         return false;
-    }
-
-    /**
-     * <p>Creates a URL that ignores the protocol, port and the params (basically everything except the Host and
-     * Path).</p>
-     * 
-     * @param url Needs to be a full and valid URL (http://www.salesforce.com/foo.html?bar)
-     * @return the "clean" URL (www.salesforce.com/foo.html for example) or null if url is empty or an Exception
-     *         happened
-     */
-    protected String getCleanedUrl(String url) {
-        if (null == url) {
-            return null;
-        }
-        try {
-            URL cleanUrl = new URL(url);
-            StringBuilder sb = new StringBuilder();
-            sb.append(cleanUrl.getHost()).append(cleanUrl.getPath());
-
-            String q = cleanUrl.getQuery();
-            if (null != q && !q.isEmpty() && !allowedParameters.isEmpty()) {
-                boolean firstItem = true;
-                // Split into parts
-                String[] qParts = q.split("&");
-                logger.debug("Query Parts: {}", (Object) qParts);
-                for (String qPart : qParts) {
-                    // Get the key
-                    String qKey = qPart;
-                    logger.debug("Query Key: {}", qKey);
-                    if (qPart.contains("=")) {
-                        qKey = qPart.substring(0, qPart.indexOf("="));
-                        logger.debug("Query Key (sub'd): {}", qKey);
-                    }
-                    // Now we check of that key is allowed
-                    if (allowedParameters.contains(qKey)) {
-                        logger.debug("allowedParameters contains {}", qKey);
-                        // We do, so attach it to the URL
-                        if (firstItem) {
-                            sb.append("?");
-                            firstItem = false;
-                        } else {
-                            sb.append("&");
-                        }
-                        sb.append(qPart);
-                    } else {
-                        logger.debug("allowedParameters DOES NOT contains {}", qKey);
-                    }
-                }
-            }
-
-            logger.trace("Cleaned up URL [{}] to this: {}", url, sb);
-            return sb.toString();
-        } catch (MalformedURLException e) {
-            logger.error("Could not clean up URL (though this could be perfectly fine) {}", url, e);
-            return null;
-        }
     }
 
     /**
@@ -1349,8 +1250,7 @@ public class SiteCrawler {
                 return true;
             }
         }
-        logger.trace("This URL [{}] did NOT match anything., checked against collection of size: {}", checkStr,
-            list.size());
+        logger.trace("This URL [{}] did NOT match anything., checked against collection of size: {}", checkStr, list.size());
         return false;
     }
 }
