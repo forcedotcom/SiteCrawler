@@ -18,20 +18,11 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.CompletionService;
 import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorCompletionService;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,10 +33,10 @@ import com.gargoylesoftware.htmlunit.util.Cookie;
 import com.salesforce.webdev.sitecrawler.beans.CrawlProgress;
 import com.salesforce.webdev.sitecrawler.beans.CrawlerConfiguration;
 import com.salesforce.webdev.sitecrawler.navigation.NavigateThread;
-import com.salesforce.webdev.sitecrawler.navigation.ProcessPage;
-import com.salesforce.webdev.sitecrawler.utils.NamedThreadFactory;
+import com.salesforce.webdev.sitecrawler.scheduler.LocalScheduler;
+import com.salesforce.webdev.sitecrawler.scheduler.Organizer;
+import com.salesforce.webdev.sitecrawler.scheduler.Scheduler;
 import com.salesforce.webdev.sitecrawler.utils.URLCleaner;
-import com.salesforce.webdev.sitecrawler.webclient.WebClientPool;
 
 /**
  * <p>This class is the central hub and referee between our network spider (NavigateThread) and our page (/HTML) parser (ProcessPage).</p>
@@ -62,11 +53,6 @@ public class SiteCrawler {
      * <p>Logger</p>
      */
     private final Logger logger = LoggerFactory.getLogger(getClass());
-
-    /**
-     * <p>A unique identifier for this particular Crawler.</p>
-     */
-    private String id;
 
     /**
      * <p>The base URL of the site, preferably the "non-https" version.</p>
@@ -125,27 +111,8 @@ public class SiteCrawler {
      */
     private int threadLimit = Runtime.getRuntime().availableProcessors();
 
-    /**
-     * <p>The factory we use to name the individual threads for the linkExecutor. We keep this as part of the SiteCrawler class in case we "reset" and, so the number will increase
-     * with each reset.</p>
-     */
-    private ThreadFactory linkExecutorThreadFactory = new NamedThreadFactory("linkExecutor");
-
-    /**
-     * <p>The factory we use to name the individual threads for the pageExecutor. We keep this as part of the SiteCrawler class in case we "reset" and, so the number will increase
-     * with each reset.</p>
-     */
-    private ThreadFactory pageExecutorThreadFactory = new NamedThreadFactory("pageExecutor");
-
-    /**
-     * <p>We keep track of the linkExecutor thread in case of a reset or shutdown, so we can wait for it do "die" properly.</p>
-     */
-    private Thread linkServiceConsumer;
-
-    /**
-     * <p>We keep track of the pageExecutor thread in case of a reset or shutdown, so we can wait for it do "die" properly.</p>
-     */
-    private Thread pageServiceConsumer;
+    private Scheduler scheduler = new LocalScheduler(this);
+    private Organizer organizer = new Organizer(scheduler);
 
     /**
      * <p>This is the ratio of I/O threads vs processing of downloaded pages. Defaults to <code>2.0</code>.</p>
@@ -174,33 +141,6 @@ public class SiteCrawler {
      * <p>For the regularly updates, this dictates how often we should print that update.</p>
      */
     private final int reportProgressPerDownloadedPages = 2000;
-
-    /**
-     * <p>This Executor determines how many I/O (network) threads to use to crawl the site (thread limit set by {@link #threadLimit}).</p>
-     */
-    private ExecutorService linkExecutor;
-
-    /**
-     * <p>This navigates and downloads the pages.</p>
-     */
-    private CompletionService<ProcessPage> linkService;
-
-    /**
-     * <p>This Executor determines how many downloaded pages we should process in parallel. The number is set by this simple rule:<br /> <code>thread limit = {@link #threadLimit} *
-     * {@link #downloadVsProcessRatio}</code></p>
-     */
-    private ExecutorService pageExecutor;
-    /**
-     * <p>This processes the downloaded pages.</p>
-     */
-    private CompletionService<Collection<String>> pageService;
-
-    /**
-     * <p>The pool is used to provide {@link WebClient}s to the {@link #linkService}.</p>
-     * 
-     * <p>By default, it is initialized to the same amount of clients as the Service has threads ({@link #threadLimit} .</p>
-     */
-    private WebClientPool wcPool;
 
     /**
      * <p>Internal counter, keeping track of how pages links still need to be retrieved.</p>
@@ -305,22 +245,7 @@ public class SiteCrawler {
      * @param id A non-blank ID (blank IDs will be ignored)
      */
     public void setId(String id) {
-        if (StringUtils.isBlank(id)) {
-            return;
-        }
-        this.id = id;
-        MDC.put("crawlId", id);
-        linkExecutorThreadFactory = new NamedThreadFactory(id + "-linkExecutor");
-        pageExecutorThreadFactory = new NamedThreadFactory(id + "-pageExecutor");
-    }
-
-    /**
-     * <p>Return the Id.</p>
-     * 
-     * @return String Id (null if not set)
-     */
-    public String getId() {
-        return id;
+        scheduler.setId(id);
     }
 
     /**
@@ -377,6 +302,10 @@ public class SiteCrawler {
         }
     }
 
+    public double getMaxProcessWaitingRatio() {
+        return maxProcessWaitingRatio;
+    }
+
     public void setDownloadVsProcessRatio(double downloadVsProcessRatio) {
         if (downloadVsProcessRatio < 0 || downloadVsProcessRatio > 1) {
             throw new IllegalArgumentException("maxProcessWaitingRatio has to be between 0 and 1");
@@ -386,6 +315,10 @@ public class SiteCrawler {
         if (running) {
             reset();
         }
+    }
+
+    public double getDownloadVsProcessRatio() {
+        return downloadVsProcessRatio;
     }
 
     /**
@@ -402,14 +335,16 @@ public class SiteCrawler {
         forcePause = false;
     }
 
+    public boolean isPaused() {
+        return forcePause;
+    }
+
     /**
      * <p>This will cause a {@link #pause()} and wait until all the queues to be empty. Afterwards, it will shut down all the page and link consumer threads.</p>
      */
     public void hardPause() {
         pause();
-        // wait for consumers to be empty
-        waitForLinkServiceConsumer();
-        waitForPageServiceConsumer();
+        scheduler.pause();
         shutdown();
     }
 
@@ -419,10 +354,12 @@ public class SiteCrawler {
     public void hardUnpause() {
         this.continueProcessing = true;
         init();
-        startLinkServiceConsumer();
-        startPageServiceConsumer();
-
+        scheduler.unpause();
         unpause();
+    }
+
+    public boolean getContinueProcessing() {
+        return continueProcessing;
     }
 
     /**
@@ -433,14 +370,18 @@ public class SiteCrawler {
     public void setIncludePath(Collection<String> paths) {
         logger.debug("Setting include path with {} items (currently scheduled: {})", paths.size(), toVisit.size());
         for (String path : paths) {
-            String excludePath = prependBaseUrlIfNeeded(path);
-            boolean ex = isExcluded(excludePath);
-            boolean sc = isScheduled(path);
-            if (!ex && !sc) {
-                toVisit.add(path);
-            }
+            offerUrl(path);
         }
         logger.debug("DONE Setting include path, currently scheduled: {})", toVisit.size());
+    }
+
+    public void offerUrl(String url) {
+        String excludePath = prependBaseUrlIfNeeded(url);
+        boolean ex = isExcluded(excludePath);
+        boolean sc = isScheduled(url);
+        if (!ex && !sc) {
+            toVisit.add(url);
+        }
     }
 
     /**
@@ -552,16 +493,17 @@ public class SiteCrawler {
     }
 
     /**
-     * <p>Remove all cookies from all {@link WebClient}s in the pool.<p>
+     * <p>Remove all cookies from all {@link WebClient}s in the pool.<p> <p>Used to return a boolean (true if cleared, false if there is no pool (yet?))
      * 
-     * @return true if cleared, false if there is no pool (yet?)
+     * @return true (backwards compatible)
      */
     public boolean clearCookies() {
-        if (null != wcPool) {
-            wcPool.clearCookies();
-            return true;
-        }
-        return false;
+        cookies.clear();
+        return true;
+    }
+
+    public List<Cookie> getCookies() {
+        return cookies;
     }
 
     /**
@@ -628,13 +570,39 @@ public class SiteCrawler {
             }
         }
 
-        startLinkServiceConsumer();
-        startPageServiceConsumer();
+        scheduler.unpause();
         startCrawler();
 
-        waitForLinkServiceConsumer();
-        waitForPageServiceConsumer();
+        scheduler.pause();
         shutdown();
+    }
+
+    public void incrementVisited() {
+        actuallyVisited.getAndIncrement();
+    }
+
+    public int getPagesScheduled() {
+        return pagesScheduled.get();
+    }
+
+    public void incrementScheduled() {
+        pagesScheduled.getAndIncrement();
+    }
+
+    public void decrementScheduled() {
+        pagesScheduled.getAndDecrement();
+    }
+
+    public int getLinksScheduled() {
+        return linksScheduled.get();
+    }
+
+    public void decrementLinksScheduled() {
+        linksScheduled.getAndDecrement();
+    }
+
+    public void incrementFullyProcessed() {
+        fullyProcessed.getAndIncrement();
     }
 
     /**
@@ -645,55 +613,8 @@ public class SiteCrawler {
         // stop the processing cleanly (and allow awaitTermination to end successfully and quickly)
         this.continueProcessing = false;
 
-        if (null != linkExecutor) {
-            linkExecutor.shutdown();
-            try {
-                linkExecutor.awaitTermination(2, TimeUnit.MINUTES);
-            } catch (InterruptedException e) {
-                logger.error("Something happened while waiting for linkExecutor to be shutdown", e);
-                Thread.currentThread().interrupt();
-            }
-        }
+        scheduler.shutdown();
 
-        if (null != pageExecutor) {
-            pageExecutor.shutdown();
-            try {
-                pageExecutor.awaitTermination(2, TimeUnit.MINUTES);
-            } catch (InterruptedException e) {
-                logger.error("Something happened while waiting for pageExecutor to be shutdown", e);
-                Thread.currentThread().interrupt();
-            }
-        }
-
-        if (null != wcPool) {
-            wcPool.close();
-        }
-
-        if (null != linkServiceConsumer) {
-            while (linkServiceConsumer.isAlive()) {
-                try {
-                    logger.info("Waiting for the linkServiceConsumer thread to die...");
-                    Thread.sleep(TimeUnit.SECONDS.toMillis(5));
-                } catch (InterruptedException e) {
-                    logger.error("Something happened while waiting for linkServiceConsumer to be shutdown", e);
-                    Thread.currentThread().interrupt();
-                }
-            }
-            logger.info("... linkServiceConsumer thread is dead");
-        }
-
-        if (null != pageServiceConsumer) {
-            while (pageServiceConsumer.isAlive()) {
-                try {
-                    logger.info("Waiting for the pageServiceConsumer thread to die...");
-                    Thread.sleep(TimeUnit.SECONDS.toMillis(5));
-                } catch (InterruptedException e) {
-                    logger.error("Something happened while waiting for pageServiceConsumer to be shutdown", e);
-                    Thread.currentThread().interrupt();
-                }
-            }
-            logger.info("... pageServiceConsumer thread is dead");
-        }
     }
 
     /**
@@ -747,6 +668,7 @@ public class SiteCrawler {
         crawlerConfiguration.shortCircuitAfter = shortCircuitAfter;
         crawlerConfiguration.disableRedirects = disableRedirects;
         crawlerConfiguration.enabledJavascript = enabledJavascript;
+        crawlerConfiguration.actions = actions;
         return crawlerConfiguration;
     }
 
@@ -754,38 +676,8 @@ public class SiteCrawler {
      * <p>Does its best to reset/recreate the WebClient Pool (wcPool) and the link and page consumers.</p>
      */
     private void init() {
-        if (null != wcPool) {
-            wcPool.close();
-        }
-        wcPool = new WebClientPool(threadLimit);
-        if (disableRedirects) {
-            wcPool.disableRedirects();
-        }
-        if (enabledJavascript) {
-            wcPool.enableJavaScript();
-        }
-        for (Cookie cookie : cookies) {
-            wcPool.addCookie(cookie);
-        }
-        wcPool.setName("Sitecrawler pool");
+        scheduler.init();
 
-        linkExecutor = Executors.newFixedThreadPool(threadLimit, linkExecutorThreadFactory);
-        linkService = new ExecutorCompletionService<ProcessPage>(linkExecutor);
-
-        int pageExecutorSize = (int) Math.ceil(threadLimit * downloadVsProcessRatio);
-        pageExecutor = Executors.newFixedThreadPool(pageExecutorSize, pageExecutorThreadFactory);
-        pageService = new ExecutorCompletionService<Collection<String>>(pageExecutor);
-
-        // in bytes
-        long maxHeap = Runtime.getRuntime().maxMemory();
-        // to mb
-        double gbMaxHeap = maxHeap / (1024.0 * 1024.0);
-        // Final result, rounded
-        int maxProcessWaiting = (int) (gbMaxHeap * maxProcessWaitingRatio);
-        setMaxProcessWaiting(maxProcessWaiting);
-
-        Object[] args = { wcPool.getName(), threadLimit, threadLimit, pageExecutorSize, maxProcessWaiting };
-        logger.info("WebClientPool {} created with size {}, linkExecutor with size {}, pageExecutor with size {}, maxProcessWaiting={}", args);
     }
 
     /**
@@ -831,172 +723,6 @@ public class SiteCrawler {
     }
 
     /**
-     * <p>The linkService takes the pages that are scheduled to be visited and executes.</p>
-     * 
-     * <p>After downloading the page, we submit the result to the {@link #pageService} to be processed.</p>
-     */
-    private void startLinkServiceConsumer() {
-        Runnable r = new Runnable() {
-
-            @Override
-            public void run() {
-                while (continueProcessing) {
-
-                    try {
-                        if (shouldPauseProcessing()) {
-                            if (forcePause) {
-                                logger.trace("[startLinkServiceConsumer] Crawler is hardpaused...");
-                            } else {
-                                logger.debug("[startLinkServiceConsumer] Analyzing pages (pausing crawling to allow the consumers to catch up)...");
-                            }
-                            Thread.sleep(TimeUnit.SECONDS.toMillis(5));
-                            continue;
-                        }
-                    } catch (InterruptedException e) {
-                        logger.error("startLinkServiceConsumer got interrupted, stopping...");
-                        Thread.currentThread().interrupt();
-                        return;
-                    }
-
-                    Future<ProcessPage> result = null;
-                    try {
-                        result = linkService.poll(5, TimeUnit.SECONDS);
-                        if (null == result) {
-                            continue;
-                        }
-                        actuallyVisited.getAndIncrement();
-                        ProcessPage processPage = result.get();
-
-                        // This happens AFTER a NavigateThread was successful
-                        processPage.setActions(actions);
-                        processPage.setBaseUrl(baseUrl);
-                        processPage.setBaseUrlSecure(baseUrlSecure);
-
-                        logger.trace("Submitting a new ProcessPage object");
-                        pageService.submit(processPage);
-                        pagesScheduled.getAndIncrement();
-                    } catch (InterruptedException e) {
-                        logger.error("[startLinkServiceConsumer] Interruped while trying to work with result {}", result, e);
-                        Thread.currentThread().interrupt();
-                    } catch (ExecutionException e) {
-                        logger.error("[startLinkServiceConsumer] Something went wrong trying to work with result {}", result, e);
-                    } catch (RejectedExecutionException e) {
-                        logger.warn("[startLinkServiceConsumer] Tried to add a ProcessPage [Future: {}], but this was rejected (shutdown in progress?)", result, e);
-                    } finally {
-                        if (result != null) {
-                            linksScheduled.getAndDecrement();
-                        }
-                    }
-                }
-            }
-        };
-        linkServiceConsumer = new Thread(r);
-        linkServiceConsumer.setDaemon(false);
-        String name = (StringUtils.isNotBlank(id) ? id + "-" + "linkServiceConsumer" : "linkServiceConsumer");
-        linkServiceConsumer.setName(name);
-        linkServiceConsumer.start();
-    }
-
-    /**
-     * <p>Waits for all the links to be processed, returns when the {@link #linksScheduled} queue is empty.</p>
-     */
-    private void waitForLinkServiceConsumer() {
-        logger.info("Shutting down LinkServiceConsumer");
-        final int secondsToWaitBetweenChecks = 5;
-        while (linksScheduled.get() > 0) {
-            logger.info("Waiting for {} links to be consumed...", linksScheduled.get());
-
-            if (!continueProcessing) {
-                logger.warn("waitForLinkServiceConsumer has been told to stop waiting..");
-                return;
-            }
-
-            try {
-                Thread.sleep(TimeUnit.SECONDS.toMillis(secondsToWaitBetweenChecks));
-            } catch (InterruptedException e) {
-                logger.error("Interruped while waiting {} seconds for the links to be consumed, stopping :(", secondsToWaitBetweenChecks, e);
-                Thread.currentThread().interrupt();
-                return;
-            }
-        }
-    }
-
-    /**
-     * <p>Processed the pages after all links are discovered. The new links are added to the queue.</p>
-     */
-    private void startPageServiceConsumer() {
-        Runnable r = new Runnable() {
-
-            @Override
-            public void run() {
-                while (continueProcessing) {
-                    Future<Collection<String>> result = null;
-                    try {
-                        result = pageService.poll(5, TimeUnit.SECONDS);
-                        if (null == result) {
-                            continue;
-                        }
-                        Collection<String> newToVisits = result.get();
-                        logger.trace("Retrieved a collection of links of size: {}...", newToVisits.size());
-                        for (String newToVisit : newToVisits) {
-                            logger.trace("Processing a new link {}", newToVisit);
-                            if (isExcluded(newToVisit)) {
-                                logger.trace("NOT adding link since it is excluded: {}", newToVisit);
-                                continue;
-                            }
-                            if (isScheduled(newToVisit)) {
-                                logger.trace("NOT adding link since it is already scheduled: {}", newToVisit);
-                                continue;
-                            }
-                            logger.trace("Adding link to the list: {}", newToVisit);
-                            toVisit.put(newToVisit);
-                        }
-                    } catch (InterruptedException e) {
-                        logger.error("[startPageServiceConsumer] Interruped while trying to work with result {}", result, e);
-                        Thread.currentThread().interrupt();
-                    } catch (ExecutionException e) {
-                        logger.error("[startPageServiceConsumer] Something went wrong trying to work with result {}", result, e);
-                    } finally {
-                        if (result != null) {
-                            fullyProcessed.getAndIncrement();
-                            pagesScheduled.getAndDecrement();
-                        }
-                    }
-                }
-            }
-        };
-        pageServiceConsumer = new Thread(r);
-        pageServiceConsumer.setDaemon(false);
-        String name = (StringUtils.isNotBlank(id) ? id + "-" + "pageServiceConsumer" : "pageServiceConsumer");
-        pageServiceConsumer.setName(name);
-        pageServiceConsumer.start();
-    }
-
-    /**
-     * <p>Waits for all the pages to be processed, returns when the {@link #pagesScheduled} queue is empty.</p>
-     */
-    private void waitForPageServiceConsumer() {
-        logger.info("Shutting down PageServiceConsumer");
-        final int secondsToWaitBetweenChecks = 5;
-        while (pagesScheduled.get() > 0) {
-            logger.info("Waiting for {} pages to be consumed...", pagesScheduled.get());
-
-            if (!continueProcessing) {
-                logger.warn("waitForPageServiceConsumer has been told to stop waiting..");
-                return;
-            }
-
-            try {
-                Thread.sleep(TimeUnit.SECONDS.toMillis(secondsToWaitBetweenChecks));
-            } catch (InterruptedException e) {
-                logger.error("Interruped while waiting {} seconds for the links to be consumed, stopping :(", secondsToWaitBetweenChecks, e);
-                Thread.currentThread().interrupt();
-                return;
-            }
-        }
-    }
-
-    /**
      * <p>This happens in the "main" thread, and will block the calling code from completing.</p>
      * 
      * <p>As soon as there is nothing to crawl or we should stop, this method returns.</p>
@@ -1027,12 +753,7 @@ public class SiteCrawler {
                 continue;
             }
 
-            NavigateThread navigateThread = new NavigateThread(url, this.wcPool);
-            try {
-                linkService.submit(navigateThread);
-            } catch (RejectedExecutionException e) {
-                logger.warn("Tried to add a NavigateThread for {}, but this was rejected (shutdown in progress?)", url, e);
-            }
+            organizer.submitUrl(url);
             linksScheduled.getAndIncrement();
 
             visited.add(url);
@@ -1044,18 +765,6 @@ public class SiteCrawler {
         }
 
         logger.info("Done crawling, {} links visited. (crosscheck: {})", visitedCounter.get(), actuallyVisited.get());
-    }
-
-    /**
-     * <p>If there are too many pages scheduled, this will return true to inform clients to pause the crawling.</p>
-     * 
-     * @return true if the process queue is too large
-     */
-    private boolean shouldPauseProcessing() {
-
-        boolean shouldPause = pagesScheduled.get() > maxProcessWaiting || forcePause;
-        logger.trace("ShouldPause=" + shouldPause + ", pagesScheduled=" + pagesScheduled.get());
-        return shouldPause;
     }
 
     /**
@@ -1145,7 +854,7 @@ public class SiteCrawler {
      * @param url A full url (should include the protocol part, eg "http://foo.bar/page/")
      * @return true if it's excluded, false otherwise
      */
-    private boolean isExcluded(String url) {
+    public boolean isExcluded(String url) {
         boolean startsWithBaseUrl = false;
         boolean startsWithBaseUrlSecure = false;
         boolean allGood = false;
@@ -1228,7 +937,7 @@ public class SiteCrawler {
      * @param url Link to check
      * @return true if the link is already on the queue, false otherwise
      */
-    private boolean isScheduled(String url) {
+    public boolean isScheduled(String url) {
         if (toVisit.contains(url)) {
             return true;
         }
