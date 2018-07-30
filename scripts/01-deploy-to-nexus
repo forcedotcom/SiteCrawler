@@ -1,0 +1,9 @@
+#!/bin/bash
+
+sudo docker run \
+  --rm \
+  -it \
+  -v "$PWD":/usr/src/mymaven -w /usr/src/mymaven \
+  -v "$PWD"/settings.xml:/root/.m2/settings.xml \
+  maven:3.5-jdk-10\
+  mvn clean deploy -Dmaven.test.skip=true

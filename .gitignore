@@ -3,3 +3,11 @@ target/
 .settings/
 .project
 .classpath
+
+# IntelliJ files [https://github.com/github/gitignore/blob/master/Global/JetBrains.gitignore]
+# User-specific stuff:
+.idea
+out/
+
+# Private settings file
+settings.xml
