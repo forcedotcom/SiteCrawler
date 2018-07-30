@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Obviously, this only works if you have a Mac and a user called "jroel"
+# This is material to fix (a lot) later on...
+
 sudo docker run \
   --rm \
   -it \
