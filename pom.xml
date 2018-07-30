@@ -4,7 +4,7 @@
 
     <groupId>com.salesforce.webdev</groupId>
     <artifactId>SiteCrawler</artifactId>
-    <version>0.0.8-SNAPSHOT</version>
+    <version>1.0.0</version>
     <packaging>jar</packaging>
 
     <name>SiteCrawler</name>
@@ -45,6 +45,10 @@
     </properties>
 
     <distributionManagement>
+        <repository>
+            <id>nexus-releases</id>
+            <url>https://nexus.jasperroel.nl/repository/maven-releases/</url>
+        </repository>
         <snapshotRepository>
             <id>nexus-snapshots</id>
             <url>https://nexus.jasperroel.nl/repository/maven-snapshots/</url>
@@ -117,10 +121,14 @@
                     <skip>true</skip>
                 </configuration>
             </plugin>
+
             <plugin>
                 <groupId>org.sonatype.plugins</groupId>
                 <artifactId>nexus-staging-maven-plugin</artifactId>
                 <version>1.5.1</version>
+                <configuration>
+                    <skipStaging>true</skipStaging>
+                </configuration>
                 <executions>
                     <execution>
                         <id>default-deploy</id>
