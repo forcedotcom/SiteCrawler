@@ -35,14 +35,14 @@ public interface SiteCrawlerAction {
      * 
      * @param page The parsed {@link HtmlPage}
      * @param hrefs A List of links (anchors with href="..." elements , iframes) found in the page
-     * @param referrer TODO <em>Need documentation</em><br />
+     * @param referrer TODO <em>Need documentation</em><br>
      *            (Currently, all implementing class ignore the referrer parameter)
      */
     void takeAction(HtmlPage page, List<String> hrefs, Set<String> referrer);
 
     /**
      * <p>When a page fails to be successfully retrieved, this method will be called. Usually this is due to a
-     * {@link FailingHttpStatusCodeException} or an empty page response (in which case the error code might be a 410
+     * {@link com.gargoylesoftware.htmlunit.FailingHttpStatusCodeException} or an empty page response (in which case the error code might be a 410
      * [410 Gone]!).
      * 
      * @param errorcode The statuscode as returned by the server (usually a non-200 code)

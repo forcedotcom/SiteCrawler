@@ -24,7 +24,7 @@ public class LocalWcPool {
     }
 
     /**
-     * <p>Remove all cookies from all {@link WebClient}s in the pool.<p>
+     * <p>Remove all cookies from all {@link WebClient}s in the pool.</p>
      * 
      * @return true if cleared, false if there is no pool (yet?)
      */
@@ -38,6 +38,8 @@ public class LocalWcPool {
 
     /**
      * <p>Does its best to reset/recreate the WebClient Pool (wcPool) and the link and page consumers.</p>
+     *
+     * @param siteCrawler An {@link SiteCrawler} to initialize
      */
     public void init(SiteCrawler siteCrawler) {
         if (null != wcPool) {
@@ -61,7 +63,7 @@ public class LocalWcPool {
     }
 
     /**
-     * <p>Tell the executors ({@link #linkExecutor} and {@link #pageExecutor} to shutdown.</p>
+     * <p>Tell the local Webclient pool to shutdown.</p>
      */
     public void shutdown() {
         if (null != wcPool) {

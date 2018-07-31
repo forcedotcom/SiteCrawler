@@ -60,7 +60,7 @@ public class LocalScheduler implements Scheduler {
     private CompletionService<Collection<String>> pageService;
 
     /**
-     * <p>This Executor determines how many I/O (network) threads to use to crawl the site (thread limit set by {@link #threadLimit}).</p>
+     * <p>This Executor determines how many I/O (network) threads to use to crawl the site (thread limit set by {@link SiteCrawler#getThreadLimit()}).</p>
      */
     private ExecutorService linkExecutor;
 
@@ -70,8 +70,8 @@ public class LocalScheduler implements Scheduler {
     private CompletionService<ProcessPage> linkService;
 
     /**
-     * <p>This Executor determines how many downloaded pages we should process in parallel. The number is set by this simple rule:<br /> <code>thread limit = {@link #threadLimit} *
-     * {@link #downloadVsProcessRatio}</code></p>
+     * <p>This Executor determines how many downloaded pages we should process in parallel. The number is set by this simple rule:<br /> <code>thread limit = {@link SiteCrawler#getThreadLimit()} *
+     * {@link SiteCrawler#getDownloadVsProcessRatio()}</code></p>
      */
     private ExecutorService pageExecutor;
 
@@ -82,11 +82,11 @@ public class LocalScheduler implements Scheduler {
     public void init() {
         localWcPool.init(siteCrawler);
         linkExecutor = Executors.newFixedThreadPool(siteCrawler.getThreadLimit(), linkExecutorThreadFactory);
-        linkService = new ExecutorCompletionService<ProcessPage>(linkExecutor);
+        linkService = new ExecutorCompletionService<>(linkExecutor);
 
         int pageExecutorSize = (int) Math.ceil(siteCrawler.getThreadLimit() * siteCrawler.getDownloadVsProcessRatio());
         pageExecutor = Executors.newFixedThreadPool(pageExecutorSize, pageExecutorThreadFactory);
-        pageService = new ExecutorCompletionService<Collection<String>>(pageExecutor);
+        pageService = new ExecutorCompletionService<>(pageExecutor);
 
         // in bytes
         long maxHeap = Runtime.getRuntime().maxMemory();
@@ -270,7 +270,7 @@ public class LocalScheduler implements Scheduler {
     }
 
     /**
-     * <p>Waits for all the links to be processed, returns when the {@link #linksScheduled} queue is empty.</p>
+     * <p>Waits for all the links to be processed, returns when the {@link SiteCrawler#getLinksScheduled()} queue is empty.</p>
      */
     private void waitForLinkServiceConsumer() {
         logger.info("Shutting down LinkServiceConsumer");
@@ -345,7 +345,7 @@ public class LocalScheduler implements Scheduler {
     }
 
     /**
-     * <p>Waits for all the pages to be processed, returns when the {@link #pagesScheduled} queue is empty.</p>
+     * <p>Waits for all the pages to be processed, returns when the {@link SiteCrawler#getPagesScheduled()} queue is empty.</p>
      */
     private void waitForPageServiceConsumer() {
         logger.info("Shutting down PageServiceConsumer");

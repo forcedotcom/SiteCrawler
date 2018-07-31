@@ -34,7 +34,7 @@ public final class URLNormalizer {
     /**
      * <p><strong> Use {@link #normalize(String, String, String)} for a better resolving experience.</strong></p>
      * 
-     * <p>If #url starts with "/", #base will be prepended.<br />
+     * <p>If #url starts with "/", #base will be prepended.<br>
      * So, if url = <code>"/x"</code> and base is <code>"base.com"</code>, the return value will be
      * <code>"base.com/x"</code>.</p>
      * 
