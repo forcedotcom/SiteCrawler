@@ -99,7 +99,7 @@ public class WebClientExtended {
     /**
      * <p>Set the amount of milliseconds to wait between retries.</p>
      * 
-     * @param recoverableErrorWaitTimeout
+     * @param recoverableErrorWaitTimeout See {@link #recoverableErrorWaitTimeout}
      */
     public void setRecoverableErrorWaitTimeout(long recoverableErrorWaitTimeout) {
         this.recoverableErrorWaitTimeout = recoverableErrorWaitTimeout;
@@ -108,7 +108,7 @@ public class WebClientExtended {
     /**
      * <p>Set the amount of times this {@link WebClientExtended} should try to recover from an error.</p>
      * 
-     * @param recoverableErrorRetryCounter
+     * @param recoverableErrorRetryCounter See {@link #recoverableErrorWaitTimeout}
      */
     public void setRecoverableErrorRetryCounter(int recoverableErrorRetryCounter) {
         this.recoverableErrorRetryCounter = recoverableErrorRetryCounter;

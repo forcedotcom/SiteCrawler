@@ -62,12 +62,12 @@ public final class WebClientFactory {
     /**
      * <p>Get a WebClient initialized to all the default of our QA environment.</p>
      * 
-     * <p>In practice that means:<ul>
+     * <p>In practice that means:</p><ul>
      * <li>The proxy is set if available</li>
      * <li>Javascript &amp; css is disabled</li>
      * <li>You will get an Exception on a failing status code</li>
      * <li>Any certificate will do for SSL (if possible)</li>
-     * </ul></p>
+     * </ul>
      * 
      * @return A fully initialized {@link WebClient}
      */

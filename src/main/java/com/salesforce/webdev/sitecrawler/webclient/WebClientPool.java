@@ -163,7 +163,7 @@ public class WebClientPool {
     }
 
     /**
-     * <p>Remove all cookies from all {@link WebClient}s in the pool.<p>
+     * <p>Remove all cookies from all {@link WebClient}s in the pool.</p>
      */
     public void clearCookies() {
         for (WebClientExtended wc : wcPool) {
@@ -174,7 +174,7 @@ public class WebClientPool {
     /**
      * <p>Take (borrow) a client.</p>
      * 
-     * <p>Please return it after usage using {@link #returnClient(WebClient)}.</p>
+     * <p>Please return it after usage using {@link #returnClient(WebClientExtended)}.</p>
      * 
      * <p>Will block if there are no clients currently.</p>
      * 

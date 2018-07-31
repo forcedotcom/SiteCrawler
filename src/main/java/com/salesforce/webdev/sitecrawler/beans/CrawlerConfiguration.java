@@ -1,6 +1,9 @@
 package com.salesforce.webdev.sitecrawler.beans;
 
+import java.util.List;
+
 import com.salesforce.webdev.sitecrawler.SiteCrawler;
+import com.salesforce.webdev.sitecrawler.SiteCrawlerAction;
 
 /**
  * <p>Simple bean to collect the configuration of the SiteCrawler.</p>
@@ -26,4 +29,5 @@ public class CrawlerConfiguration {
 
     public boolean disableRedirects;
     public boolean enabledJavascript;
+    public List<? extends SiteCrawlerAction> actions;
 }
