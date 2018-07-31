@@ -230,7 +230,11 @@ public class SiteCrawler {
     public SiteCrawler(String baseUrl, String baseUrlSecure, List<? extends SiteCrawlerAction> actions) {
         this.baseUrl = baseUrl;
         this.baseUrlSecure = baseUrlSecure;
-        this.actions = actions;
+        if (null == actions) {
+            this.actions = Collections.emptyList();
+        } else {
+            this.actions = actions;
+        }
         parseVMOptions();
         addDefaultAllowedSuffixes();
     }
@@ -557,11 +561,6 @@ public class SiteCrawler {
      * 
      */
     public void navigate() {
-        Object[] args = { toVisit.size(), actions.size(), actions };
-        logger.info("Starting crawl with the {} defined endpoints and {} plugins: {}", args);
-        this.running = true;
-        init();
-
         if (toVisit.isEmpty()) {
             if (null != baseUrl) {
                 toVisit.add(baseUrl);
@@ -571,6 +570,11 @@ public class SiteCrawler {
         }
 
         scheduler.unpause();
+        Object[] args = { toVisit.size(), actions.size(), actions };
+        logger.info("Starting crawl with the {} defined endpoints and {} plugins: {}", args);
+        this.running = true;
+        init();
+
         startCrawler();
 
         scheduler.pause();
@@ -677,7 +681,6 @@ public class SiteCrawler {
      */
     private void init() {
         scheduler.init();
-
     }
 
     /**
@@ -859,18 +862,18 @@ public class SiteCrawler {
         boolean startsWithBaseUrlSecure = false;
         boolean allGood = false;
         if (null != baseUrl && url.startsWith(baseUrl)) {
-            logger.trace("startsWithBaseUrl: {}", url);
+            logger.trace("[isExcluded] startsWithBaseUrl: {}", url);
             startsWithBaseUrl = true;
         }
 
         if (null != baseUrlSecure && url.startsWith(baseUrlSecure)) {
-            logger.trace("startsWith baseUrlSecure: {}", url);
+            logger.trace("[isExcluded] startsWith baseUrlSecure: {}", url);
             startsWithBaseUrlSecure = true;
         }
 
         // What about relative (from the base) URLs? We can have "/foo.bar", just not "//foo.bar"
         if (url.length() > 1 && url.startsWith("/") && !url.startsWith("//")) {
-            logger.trace("This is a relative url, pointing to the BASE: {}", url);
+            logger.trace("[isExcluded] This is a relative url, pointing to the BASE: {}", url);
             allGood = true;
         }
 
@@ -883,48 +886,48 @@ public class SiteCrawler {
 
         // If it doesn't start with either of the baseUrls (or they are simply not set), we don't allow the URL
         if (!startsWithBaseUrl && !startsWithBaseUrlSecure && !allGood) {
-            logger.trace("!startsWithBaseUrl && !startsWithBaseUrlSecure && !allGood: {}", url);
+            logger.trace("[isExcluded] !startsWithBaseUrl && !startsWithBaseUrlSecure && !allGood: {}", url);
             return true;
         }
 
         boolean hasAllowedSuffix = false;
         String suffix = url.split("\\?")[0].toLowerCase();
         for (String allowedSuffix : allowedSuffixes) {
-            logger.trace("Matching allowed suffix [{}] against URL {}", allowedSuffix, suffix, url);
+            logger.trace("[isExcluded] Matching allowed suffix [{}] against URL {}", allowedSuffix, suffix, url);
             if (suffix.endsWith(allowedSuffix)) {
                 hasAllowedSuffix = true;
                 break;
             }
         }
         if (!requireAllowedSuffixes) {
-            logger.trace("requireAllowedSuffixes = false, so setting hasAllowedSuffix to true");
+            logger.trace("[isExcluded] requireAllowedSuffixes = false, so setting hasAllowedSuffix to true");
             hasAllowedSuffix = true;
         }
 
         if (!hasAllowedSuffix) {
-            logger.trace("not allowing suffix {} for {}", suffix, url);
+            logger.trace("[isExcluded] not allowing suffix {} for {}", suffix, url);
             return true;
         }
 
         if (visited.contains(url)) {
-            logger.trace("We already visited [{}], skipping it.", url);
+            logger.trace("[isExcluded] We already visited [{}], skipping it.", url);
             return true;
         }
 
         if (listContainsSubstring(blocked, url)) {
-            logger.trace("This URL is blocked [{}], skipping it.", url);
+            logger.trace("[isExcluded] This URL is blocked [{}], skipping it.", url);
             return true;
         }
 
         if (!allowed.isEmpty() && !listContainsSubstring(allowed, url)) {
-            logger.trace("This URL is not allowed [{}], skipping it.", url);
+            logger.trace("[isExcluded] This URL is not allowed [{}], skipping it.", url);
             return true;
         }
 
         // Also check the cleaned URL
         String cleanUrl = urlCleaner.getCleanedUrl(url);
         if (null != cleanUrl && visited.contains(cleanUrl)) {
-            logger.trace("The cleaned URL is blocked [{}], skipping it.", url);
+            logger.trace("[isExcluded] The cleaned URL is blocked [{}], skipping it.", url);
             return true;
         }
 

@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Obviously, this only works if you have a Mac and a user called "jroel"
+# This is material to fix (a lot) later on...
+
+sudo docker run \
+  --rm \
+  -it \
+  -v "$PWD":/usr/src/mymaven -w /usr/src/mymaven \
+  -v /Users/jroel/.m2:/root/.m2 \
+  -v /Users/jroel/.m2/repository-docker:/root/.m2/repository \
+  -v /Users/jroel/.gnupg:/root/.gnupg \
+  maven:3.5-jdk-10 \
+  bash -c "export GPG_TTY=\$(tty) && mvn $@"
