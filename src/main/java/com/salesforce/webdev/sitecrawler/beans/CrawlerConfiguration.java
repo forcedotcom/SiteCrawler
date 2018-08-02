@@ -1,7 +1,9 @@
 package com.salesforce.webdev.sitecrawler.beans;
 
+import java.util.LinkedList;
 import java.util.List;
 
+import com.gargoylesoftware.htmlunit.util.Cookie;
 import com.salesforce.webdev.sitecrawler.SiteCrawler;
 import com.salesforce.webdev.sitecrawler.SiteCrawlerAction;
 
@@ -30,4 +32,6 @@ public class CrawlerConfiguration {
     public boolean disableRedirects;
     public boolean enabledJavascript;
     public List<? extends SiteCrawlerAction> actions;
+
+    public List<Cookie> cookies = new LinkedList<>();
 }

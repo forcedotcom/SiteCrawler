@@ -23,6 +23,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.salesforce.webdev.sitecrawler.scheduler.rabbitmq.RabbitMqScheduler;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,7 +111,7 @@ public class SiteCrawler {
      */
     private int threadLimit = Runtime.getRuntime().availableProcessors();
 
-    private Scheduler scheduler = new LocalScheduler(this);
+    private Scheduler scheduler = new RabbitMqScheduler(this);
     private Organizer organizer = new Organizer(scheduler);
 
     /**
@@ -263,7 +264,7 @@ public class SiteCrawler {
     /**
      * <p>Sets the threadLimit.</p>
      *
-     * <p>Determines the amount of I/O threads used for crawling) and (based on downloadVsProcessRatio) the amount of threads for processing downloaded pages.</p>
+     * <p>Determines the amount of I/O threads used for crawling) and (based on {@link #downloadVsProcessRatio}) the amount of threads for processing downloaded pages.</p>
      *
      * <p><strong>NOTE</strong>: calling this while the crawler is running cause a reset (see {@link #reset()}.</p>
      *
@@ -672,6 +673,7 @@ public class SiteCrawler {
         crawlerConfiguration.disableRedirects = disableRedirects;
         crawlerConfiguration.enabledJavascript = enabledJavascript;
         crawlerConfiguration.actions = actions;
+        crawlerConfiguration.cookies = cookies;
         return crawlerConfiguration;
     }
 

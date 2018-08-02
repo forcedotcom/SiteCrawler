@@ -1,5 +1,6 @@
 package com.salesforce.webdev.sitecrawler.scheduler;
 
+import com.salesforce.webdev.sitecrawler.beans.CrawlerConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,27 +40,37 @@ public class LocalWcPool {
     /**
      * <p>Does its best to reset/recreate the WebClient Pool (wcPool) and the link and page consumers.</p>
      *
+     * <p>Calls {@link #init(CrawlerConfiguration)} directly.</p>
+     *
      * @param siteCrawler An {@link SiteCrawler} to initialize
      */
     public void init(SiteCrawler siteCrawler) {
+        init(siteCrawler.getCrawlerConfiguration());
+    }
+
+    /**
+     * <p>Does its best to reset/recreate the WebClient Pool (wcPool) and the link and page consumers.</p>
+     *
+     * @param crawlerConfiguration A {@link CrawlerConfiguration} to initialize
+     */
+    public void init(CrawlerConfiguration crawlerConfiguration) {
         if (null != wcPool) {
             wcPool.close();
         }
-        wcPool = new WebClientPool(siteCrawler.getCrawlerConfiguration().threadLimit);
-        if (siteCrawler.getCrawlerConfiguration().disableRedirects) {
+        wcPool = new WebClientPool(crawlerConfiguration.threadLimit);
+        if (crawlerConfiguration.disableRedirects) {
             wcPool.disableRedirects();
         }
-        if (siteCrawler.getCrawlerConfiguration().enabledJavascript) {
+        if (crawlerConfiguration.enabledJavascript) {
             wcPool.enableJavaScript();
         }
-        for (Cookie cookie : siteCrawler.getCookies()) {
+        for (Cookie cookie : crawlerConfiguration.cookies) {
             wcPool.addCookie(cookie);
         }
         wcPool.setName("Sitecrawler pool");
 
-        Object[] args = { wcPool.getName(), siteCrawler.getCrawlerConfiguration().threadLimit };
+        Object[] args = { wcPool.getName(), crawlerConfiguration.threadLimit };
         logger.info("WebClientPool {} created with size {}", args);
-
     }
 
     /**

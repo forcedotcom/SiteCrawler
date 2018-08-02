@@ -11,6 +11,7 @@
  ******************************************************************************/
 package com.salesforce.webdev.sitecrawler.utils;
 
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,7 +49,7 @@ public final class URLNormalizer {
      */
     public static String normalize(String url, String base) {
         url = url.trim();
-        if (url.startsWith("/") && !url.startsWith("//")) {
+        if (StringUtils.isNotBlank(base) && url.startsWith("/") && !url.startsWith("//")) {
             url = base + url;
         }
 

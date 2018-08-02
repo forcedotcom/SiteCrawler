@@ -214,8 +214,10 @@ public class ProcessPage implements Callable<Collection<String>> {
                 hrefs.add(link.getHrefAttribute());
             }
         }
-        for (SiteCrawlerAction sca : actions) {
-            sca.takeAction(htmlpage, hrefs, urlFrom.get(location));
+        if (null != actions) {
+            for (SiteCrawlerAction sca : actions) {
+                sca.takeAction(htmlpage, hrefs, urlFrom.get(location));
+            }
         }
 
         for (String href : hrefs) {
@@ -272,8 +274,10 @@ public class ProcessPage implements Callable<Collection<String>> {
             webResponse = page.getWebResponse();
         }
 
-        for (SiteCrawlerAction sca : actions) {
-            sca.handleError(errorCode, location, urlFrom.get(location), webResponse);
+        if (null != actions) {
+            for (SiteCrawlerAction sca : actions) {
+                sca.handleError(errorCode, location, urlFrom.get(location), webResponse);
+            }
         }
     }
 
@@ -334,8 +338,10 @@ public class ProcessPage implements Callable<Collection<String>> {
      * @param e FailingHttpStatusCodeException The exception to be handled
      */
     private void handleFailingHttpStatusCodeException(FailingHttpStatusCodeException e) {
-        for (SiteCrawlerAction sca : actions) {
-            sca.handleError(e.getStatusCode(), location, urlFrom.get(location), e.getResponse());
+        if (null != actions) {
+            for (SiteCrawlerAction sca : actions) {
+                sca.handleError(e.getStatusCode(), location, urlFrom.get(location), e.getResponse());
+            }
         }
     }
 
@@ -344,8 +350,10 @@ public class ProcessPage implements Callable<Collection<String>> {
             ExceptionUtils.getFullStackTrace(t).getBytes(), statusCode, ExceptionUtils.getMessage(t),
             null);
         WebResponse webResponse = new WebResponse(webResponseData, null, 0);
-        for (SiteCrawlerAction sca : actions) {
-            sca.handleError(statusCode, location, urlFrom.get(location), webResponse);
+        if (null != actions) {
+            for (SiteCrawlerAction sca : actions) {
+                sca.handleError(statusCode, location, urlFrom.get(location), webResponse);
+            }
         }
     }
 
