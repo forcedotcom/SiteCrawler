@@ -13,8 +13,9 @@ import java.util.concurrent.TimeoutException;
  */
 public class RabbitMqConnection {
 
-    private final String userName = "eyxcamci";
-    private final String password = "yVxBTwtbv6ICXA9sanJ2Ec7XS9430bw_";
+    // TODO Replace with environment variables
+    private final String userName = "username";
+    private final String password = "password"
     private final String virtualHost = userName;
     private final String hostName = "sheep.rmq.cloudamqp.com";
     //private final int portNumber = 443;

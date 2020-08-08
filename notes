@@ -1,0 +1,7 @@
+Remove hardcoded username/password etc from rabbitmq
+make choice for scheduler an environment option (local vs rabbitmq)
+Make the parsers work (now they are empty on the client)
+
+Later:
+For every crawl, use a new ID. This ID should be attached to the URL into rabbitMQ
+This should also go back once it's parsed, back into the master
